@@ -1,4 +1,5 @@
 # NetViz
+<img width="1448" height="1086" alt="image" src="https://github.com/user-attachments/assets/1ee86036-d72d-4979-b68d-cf8503af0db4" />
 
 **See everything on your local network — in seconds, with one download.**
 
