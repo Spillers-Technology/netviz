@@ -303,8 +303,91 @@ h1 {
   font-weight: 700;
 }
 
+.heroNote {
+  margin-top: 16px !important;
+  color: rgba(255, 255, 255, 0.62) !important;
+  font-size: 15px !important;
+}
+
 .band {
   padding: clamp(42px, 7vw, 84px) clamp(18px, 5vw, 64px);
+}
+
+.downloadBand {
+  background: #0f6cbd;
+  color: #ffffff;
+}
+
+.downloadHead h2 {
+  color: #ffffff;
+}
+
+.downloadHead p {
+  max-width: 720px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.downloads {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.dl {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 20px;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1f1f1f;
+  text-decoration: none;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.dl:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.26);
+}
+
+.dl b {
+  font-size: 20px;
+}
+
+.dl span {
+  color: #4b4b4b;
+  font-size: 15px;
+}
+
+.dl code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #eef1f4;
+  font-size: 13px;
+}
+
+.dl em {
+  margin-top: 6px;
+  color: #6a6a6a;
+  font-size: 12px;
+  font-style: normal;
+  word-break: break-word;
+}
+
+.dlNote {
+  max-width: 760px !important;
+  margin-top: 22px !important;
+  color: rgba(255, 255, 255, 0.86) !important;
+  font-size: 15px !important;
+}
+
+.dlNote code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 13px;
 }
 
 .intro,
@@ -450,6 +533,10 @@ footer {
   .pipeline,
   .roadmap ol {
     grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+
+  .downloads {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -1,178 +1,164 @@
 # NetViz
 
-NetViz is a modern FOSS LAN scanner and network visualization tool. It is built
-around a native Go TCP-connect scanner, a typed event stream, and a Wails desktop
-app that turns scan results into tables, maps, hierarchy nodes, history, and
-exports.
+**See everything on your local network — in seconds, with one download.**
 
-NetViz is not an Nmap wrapper, vulnerability scanner, remote shell, credential
-tool, or RMM platform. It intentionally avoids raw packet scanning, SYN scans,
-remote command execution, and credential handling.
+NetViz is a free, open-source LAN scanner and network visualizer for Windows,
+macOS, and Linux. Point it at your network, hit scan, and watch devices appear
+live as tables, a grouped graph, and a clickable hierarchy map. It's a modern
+take on tools like Advanced IP Scanner and Angry IP Scanner, built on a fast
+native Go scan engine.
 
-> Safety note: only scan networks you own or are explicitly authorized to scan.
+No agents. No accounts. No Nmap. Just download and run.
 
-## Current Release: v0.0.1
+> **Authorized use only.** Scan networks you own or have explicit permission to
+> scan.
 
-v0.0.1 is the first desktop release candidate. The scope is broader than the
-original table-only plan because the visual layer became central to the product.
+---
 
-Included:
+## Download
 
-- Wails desktop app for macOS local testing.
-- CIDR validation and bounded native Go TCP-connect scanning.
-- Live event stream from scanner core to UI and CLI.
-- Start, cancel, and monitor scan controls.
-- Monitor mode that rescans periodically and marks devices as new, online,
-  offline, changed, or stable.
-- Table view with IP, hostname, MAC, vendor, alive status, open ports, device
-  type, and timestamps.
-- Graph view grouped by inferred device category.
-- Hierarchy view with a firewall/root node, compact device circles, click-to-
-  inspect details, and checked-only filtering.
-- Checked-only dead addresses hidden by default across the main views.
-- File menu actions for opening saved scan data, saving scan data, and saving
-  CSV.
-- SQLite local history with latest-run diff support.
-- CLI parity for scan JSON events, saved scan history, and latest diff.
-- Placeholder server and Docker image path for future probe/server mode.
-- Self-hosted GitHub Actions for CI, Docker, desktop, and release assets.
-- Static `/docs` landing page for GitHub Pages.
+Grab the latest build for your platform from the
+**[Releases page](https://github.com/spilloid/netviz/releases/latest)** — the
+desktop app is ready to run, no toolchain required.
 
-Still rough in v0.0.1:
+| Platform | Download | Run |
+| --- | --- | --- |
+| **Windows** | `netviz-<version>-windows-amd64.zip` | Unzip, open `desktop/`, run **`netviz.exe`** |
+| **macOS** | `netviz-<version>-darwin-arm64.tar.gz` (Apple Silicon) or `-amd64` (Intel) | Extract, then open **`netviz.app`** |
+| **Linux** | `netviz-<version>-linux-amd64.tar.gz` | Extract, then run **`./desktop/netviz`** |
 
-- The visualizations are useful but still early.
-- Device type classification is intentionally simple.
-- MAC/vendor enrichment is best-effort from the local ARP cache.
-- Server/probe ingest is placeholder only.
-- Packaging is functional but not yet polished for end users.
+Each archive also bundles the `netviz-cli` command-line scanner (see
+[CLI](#command-line) below) plus a SHA-256 checksum file to verify your
+download.
 
-## Quick Start: Desktop
+### First-launch notes
 
-Prerequisites:
+These are early FOSS builds and aren't code-signed yet, so your OS may warn you
+the first time:
 
-- Go 1.25 or newer
-- Node.js and npm
-- Wails v2 CLI
+- **Windows** — SmartScreen may show "Windows protected your PC." Click **More
+  info → Run anyway**.
+- **macOS** — Gatekeeper may say the app is from an unidentified developer.
+  **Right-click `netviz.app` → Open**, then confirm. (Or `xattr -dr
+  com.apple.quarantine netviz.app`.)
+- **Linux** — make sure the binary is executable: `chmod +x desktop/netviz`.
+
+---
+
+## What it does
+
+- **Live LAN discovery** — enter a CIDR (e.g. `192.168.1.0/24`), and NetViz
+  TCP-connect scans a focused set of common LAN ports while results stream in.
+- **Three views of one scan:**
+  - **Table** — IP, hostname, MAC, vendor, alive status, open ports, guessed
+    device type, first-seen and last-updated timestamps.
+  - **Graph** — devices grouped by inferred category with open-port badges.
+  - **Hierarchy map** — a firewall/root node at the center with clickable device
+    circles around it, built to stay readable on `/24` scans.
+- **Monitor mode** — re-scans on an interval and flags devices as **new,
+  online, offline, changed,** or **stable** so you can watch the network move.
+- **Best-effort enrichment** — hostname resolution plus MAC/vendor lookup from
+  your local ARP cache.
+- **Save, open, and export** — save and reopen scans as NetViz JSON, or export
+  to CSV from the File menu.
+- **Local history** — completed scans are stored in a local SQLite database, and
+  NetViz can diff the two most recent runs.
+
+NetViz is intentionally focused. It is **not** an Nmap wrapper, vulnerability
+scanner, credential tool, remote shell, or RMM platform. No raw packet scanning,
+no SYN scans, no remote command execution.
+
+---
+
+## Command line
+
+Every release archive includes `netviz-cli`, which uses the same scan engine and
+history store as the desktop app:
 
 ```sh
-go test ./...
+# Stream scan results as JSON
+netviz-cli scan -cidr 192.168.1.0/24
+
+# Save a scan to local history, then review it
+netviz-cli scan -cidr 192.168.1.0/24 -save
+netviz-cli history
+netviz-cli diff
+```
+
+---
+
+## Build from source
+
+You only need this if you want to develop NetViz or build it yourself — most
+people should just [download a release](#download).
+
+**Prerequisites:** Go 1.25+, Node.js + npm, and the
+[Wails v2](https://wails.io/) CLI.
+
+```sh
+# Run the desktop app in dev mode
 npm ci --prefix desktop/frontend
-cd desktop
-wails dev
-```
+cd desktop && wails dev
 
-Packaged desktop build:
-
-```sh
-make build-desktop
-open desktop/build/bin/netviz.app
-```
-
-## Quick Start: CLI
-
-Print JSON scan events:
-
-```sh
-go run ./cmd/netviz-cli scan -cidr 192.168.1.0/24
-```
-
-Save a scan to local SQLite history:
-
-```sh
-./bin/netviz-cli scan -cidr 192.168.1.0/24 -save
-./bin/netviz-cli history
-./bin/netviz-cli diff
-```
-
-The CLI uses the same scanner core and history model as the desktop app.
-
-## Quick Start: Server Docker Image
-
-The Docker image runs server mode, not the Wails desktop app. Server ingest is
-planned for a later release; v0.0.1 exposes placeholders.
-
-```sh
-docker run -p 8080:8080 ghcr.io/spilloid/netviz
-```
-
-Server v0.0.1 currently provides:
-
-- `/healthz`
-- `/api/version`
-- `/api/scans`
-- `/`
-
-## Development Setup
-
-```sh
-make test
-make lint
-make build-cli
-make build-server
-make build-probe
+# Or produce a packaged build
 make build-desktop
 ```
 
-Frontend builds:
+Other targets:
 
 ```sh
-npm ci --prefix web
-npm run --prefix web build
-npm ci --prefix desktop/frontend
-npm run --prefix desktop/frontend build
+make test          # go test ./...
+make lint          # go vet ./...
+make build-cli     # native CLI scanner
+make build-server  # placeholder server (see roadmap)
+make build-probe   # placeholder headless probe (see roadmap)
 ```
 
-## Releases
+The SQLite history store uses the pure-Go `modernc.org/sqlite` driver, so no
+CGO is required.
 
-GitHub Actions are configured for self-hosted runners only. Publishing a GitHub
-Release triggers Linux, Windows, and macOS release builds when matching
-self-hosted runners are available, then attaches platform archives and SHA-256
-checksums to the release.
-
-See [RELEASING.md](RELEASING.md).
+---
 
 ## Architecture
 
-The project is built around one rule:
+NetViz is built around one rule:
 
 ```text
 ScanEngine -> EventBus -> Consumers
 ```
 
-Current consumers:
+The scanner core (`internal/scanner`) has no dependency on Wails, React, the
+HTTP server, storage, or UI code. Every view — table, graph, hierarchy, CLI
+JSON, file export, and SQLite history — consumes the same typed event stream.
 
-- desktop table view
-- desktop grouped graph view
-- desktop hierarchy visualization
-- JSON event CLI
-- File-backed scan save/open and CSV save
-- SQLite history and diff storage
+```text
+Current consumers   Desktop table · grouped graph · hierarchy map
+                    CLI JSON output · file save/open · CSV export
+                    SQLite history + diff · monitor mode
 
-Future consumers:
+Future consumers    Headless probe reporter · server ingest endpoint
+                    Web UI latest-state view · websocket event streamer
+```
 
-- headless probe reporter
-- server ingest endpoint
-- web UI latest-state view
-- websocket event streamer
+---
 
-The scanner core must stay reusable outside Wails.
+## Roadmap
 
-## Roadmap Summary
+- **v0.0.1** — desktop scanner, live monitoring, visualizations, history, CLI
+  parity *(current)*
+- **v0.0.2** — visual polish, packaging, signed installers, screenshots
+- **v0.0.3** — history/diff UX and scan management
+- **v0.1.0** — `netviz-probe` headless scanner that emits JSON
+- **v0.1.5** — single-tenant server ingest + Docker image at
+  `ghcr.io/spilloid/netviz`
+- **v0.1.9** — multi-tenant hosted/server mode with probe enrollment
+- **v0.2.0** — performance, accessibility, and docs
 
-- v0.0.1: desktop scanner, live monitoring, visualizations, history, CLI parity
-- v0.0.2: visual polish, interaction quality, packaging, release hardening
-- v0.0.3: history/diff UX improvements and scan management
-- v0.1.0: headless probe
-- v0.1.5: single-tenant server ingest and Docker-hosted web UI
-- v0.1.9: multi-tenant hosted/server mode
-- v0.2.0: polish, performance, accessibility, and docs
+See [MILESTONES.md](MILESTONES.md) for acceptance criteria,
+[CHANGELOG.md](CHANGELOG.md) for release notes, and
+[RELEASING.md](RELEASING.md) for the build/release process.
 
-See [MILESTONES.md](MILESTONES.md) for acceptance criteria.
-
-See [CHANGELOG.md](CHANGELOG.md) for release notes.
-
-Product release notes for v0.0.1 are in
-[RELEASE_NOTES_v0.0.1.md](RELEASE_NOTES_v0.0.1.md).
+---
 
 ## License
 

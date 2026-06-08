@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="NetViz is a modern FOSS LAN scanner and network visualization tool built with Go, Wails, React, and an event-first scanner architecture."
+      content="NetViz is a free, open-source LAN scanner and network visualizer for Windows, macOS, and Linux. Download, scan, and see every device on your network live."
     />
-    <title>NetViz | Modern LAN Scanner</title>
+    <title>NetViz | Free LAN Scanner &amp; Network Visualizer</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -17,7 +17,8 @@
         <span>NetViz</span>
       </a>
       <nav>
-        <a href="#status">Status</a>
+        <a href="#download">Download</a>
+        <a href="#features">Features</a>
         <a href="#architecture">Architecture</a>
         <a href="#roadmap">Roadmap</a>
         <a href="https://github.com/spilloid/netviz">GitHub</a>
@@ -72,27 +73,63 @@
         </div>
 
         <div class="heroCopy">
-          <p class="eyebrow">FOSS LAN scanner</p>
+          <p class="eyebrow">Free &amp; open-source LAN scanner</p>
           <h1 id="hero-title">NetViz</h1>
           <p>
-            A modern desktop scanner for seeing what is on your local network,
-            built around a native Go scan engine and live event stream.
+            See every device on your local network in seconds. Download, hit
+            scan, and watch results stream in as tables, a grouped graph, and a
+            clickable hierarchy map. Windows, macOS, and Linux.
           </p>
           <div class="heroActions">
-            <a class="button primary" href="https://github.com/spilloid/netviz">View on GitHub</a>
-            <a class="button" href="#quickstart">Quick start</a>
+            <a class="button primary" href="#download">Download for free</a>
+            <a class="button" href="https://github.com/spilloid/netviz">View on GitHub</a>
           </div>
+          <p class="heroNote">No agents · no accounts · no Nmap · just run it.</p>
         </div>
       </section>
 
-      <section id="status" class="band intro">
+      <section id="download" class="band downloadBand">
+        <div class="downloadHead">
+          <h2>Download NetViz</h2>
+          <p>
+            Grab the build for your platform from the latest release. The desktop
+            app is ready to run — no Go, Node, or build tools required.
+          </p>
+        </div>
+        <div class="downloads">
+          <a class="dl" href="https://github.com/spilloid/netviz/releases/latest">
+            <b>Windows</b>
+            <span>Unzip and run <code>netviz.exe</code></span>
+            <em>netviz-&lt;version&gt;-windows-amd64.zip</em>
+          </a>
+          <a class="dl" href="https://github.com/spilloid/netviz/releases/latest">
+            <b>macOS</b>
+            <span>Extract and open <code>netviz.app</code></span>
+            <em>netviz-&lt;version&gt;-darwin-arm64 / amd64.tar.gz</em>
+          </a>
+          <a class="dl" href="https://github.com/spilloid/netviz/releases/latest">
+            <b>Linux</b>
+            <span>Extract and run <code>./desktop/netviz</code></span>
+            <em>netviz-&lt;version&gt;-linux-amd64.tar.gz</em>
+          </a>
+        </div>
+        <p class="dlNote">
+          Early FOSS builds aren't code-signed yet. On first launch, Windows
+          SmartScreen (More info → Run anyway) or macOS Gatekeeper (right-click →
+          Open) may need a confirmation. Every archive also ships the
+          <code>netviz-cli</code> command-line scanner and a SHA-256 checksum.
+        </p>
+      </section>
+
+      <section id="features" class="band intro">
         <div>
-          <h2>Focused by design</h2>
+          <h2>One scan, three views</h2>
           <p>
             NetViz discovers hosts on an authorized CIDR, TCP-connect scans a
-            small default port set, resolves names when possible, and streams
-            results into table, graph, hierarchy, monitor, history, and export
-            consumers.
+            focused set of common LAN ports, resolves names and vendors when it
+            can, and streams everything into a precise table, a grouped graph,
+            and a hierarchy map. Monitor mode re-scans on an interval and flags
+            devices as new, online, offline, changed, or stable.
           </p>
         </div>
         <ul class="checks" aria-label="Project boundaries">
@@ -104,20 +141,25 @@
 
       <section id="quickstart" class="band split">
         <div>
-          <h2>Try it locally</h2>
+          <h2>Prefer the command line?</h2>
           <p>
-            The v0.0.1 path is the desktop app, with CLI parity for event
-            output, saved scan history, and latest-run diffs.
+            Every release bundles <code>netviz-cli</code>, which shares the same
+            scan engine and local history store as the desktop app — scan,
+            save, list, and diff runs as JSON.
           </p>
         </div>
-        <pre><code>go test ./...
-make build-cli
-./bin/netviz-cli scan -cidr 192.168.1.0/24 -save
-cd desktop && wails dev</code></pre>
+        <pre><code>netviz-cli scan -cidr 192.168.1.0/24
+netviz-cli scan -cidr 192.168.1.0/24 -save
+netviz-cli history
+netviz-cli diff</code></pre>
       </section>
 
       <section id="architecture" class="band">
         <h2>Event-first architecture</h2>
+        <p>
+          A native Go scan engine emits a typed event stream that every view
+          consumes — the same data drives the UI, the CLI, and local history.
+        </p>
         <div class="pipeline" aria-label="Architecture pipeline">
           <span>ScanEngine</span>
           <strong>EventBus</strong>
@@ -132,7 +174,7 @@ cd desktop && wails dev</code></pre>
         <h2>Roadmap</h2>
         <ol>
           <li><b>v0.0.1</b><span>Desktop scanner with table, graph, hierarchy, monitor, export, and history.</span></li>
-          <li><b>v0.0.2</b><span>Visual polish, packaging, screenshots, and release hardening.</span></li>
+          <li><b>v0.0.2</b><span>Visual polish, signed installers, screenshots, and release hardening.</span></li>
           <li><b>v0.0.3</b><span>History/diff UX and scan management.</span></li>
           <li><b>v0.1.x</b><span>Headless probe, server ingest, Docker image.</span></li>
         </ol>
@@ -140,7 +182,7 @@ cd desktop && wails dev</code></pre>
     </main>
 
     <footer>
-      <span>MIT licensed.</span>
+      <span>MIT licensed · <a href="https://github.com/spilloid/netviz">github.com/spilloid/netviz</a></span>
       <span>Only scan networks you own or are authorized to scan.</span>
     </footer>
 
