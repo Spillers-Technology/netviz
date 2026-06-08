@@ -3,7 +3,7 @@ package storage
 import (
 	"sync"
 
-	"github.com/spilloid/netviz/internal/model"
+	"github.com/Spillers-Technology/netviz/internal/model"
 )
 
 type MemoryStore struct {

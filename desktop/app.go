@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spilloid/netviz/internal/model"
-	"github.com/spilloid/netviz/internal/scanner"
-	"github.com/spilloid/netviz/internal/storage"
+	"github.com/Spillers-Technology/netviz/internal/model"
+	"github.com/Spillers-Technology/netviz/internal/scanner"
+	"github.com/Spillers-Technology/netviz/internal/storage"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

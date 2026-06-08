@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/spilloid/netviz/internal/model"
+	"github.com/Spillers-Technology/netviz/internal/model"
 )
 
 func newEvent(scanID string, eventType model.ScanEventType) model.ScanEvent {

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/spilloid/netviz/internal/server"
+	"github.com/Spillers-Technology/netviz/internal/server"
 )
 
 func main() {

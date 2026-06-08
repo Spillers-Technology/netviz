@@ -143,7 +143,7 @@ Goal: add single-tenant server ingest and a useful containerized web UI.
 Features:
 
 - Go HTTP server mode.
-- Docker image published to `ghcr.io/spilloid/netviz`.
+- Docker image published to `ghcr.io/spillers-technology/netviz`.
 - Server receives scan observations from probes.
 - Server stores scan runs and host observations.
 - Server renders latest state in a React web UI.
@@ -156,7 +156,7 @@ Non-goals:
 
 Acceptance criteria:
 
-- `docker run -p 8080:8080 ghcr.io/spilloid/netviz` serves the app.
+- `docker run -p 8080:8080 ghcr.io/spillers-technology/netviz` serves the app.
 - Server accepts probe observations.
 - Latest network state renders in the web UI.
 

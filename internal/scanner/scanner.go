@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/spilloid/netviz/internal/model"
+	"github.com/Spillers-Technology/netviz/internal/model"
 )
 
 const (

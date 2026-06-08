@@ -1,4 +1,4 @@
-module github.com/spilloid/netviz
+module github.com/Spillers-Technology/netviz
 
 go 1.25.0
 

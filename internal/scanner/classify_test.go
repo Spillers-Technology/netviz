@@ -3,7 +3,7 @@ package scanner
 import (
 	"testing"
 
-	"github.com/spilloid/netviz/internal/model"
+	"github.com/Spillers-Technology/netviz/internal/model"
 )
 
 func TestClassifyDevice(t *testing.T) {

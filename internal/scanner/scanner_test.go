@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spilloid/netviz/internal/model"
+	"github.com/Spillers-Technology/netviz/internal/model"
 )
 
 func TestScannerEmitsPortOpenAndHostDone(t *testing.T) {

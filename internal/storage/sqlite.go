@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spilloid/netviz/internal/model"
+	"github.com/Spillers-Technology/netviz/internal/model"
 	_ "modernc.org/sqlite"
 )
 

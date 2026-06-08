@@ -54,7 +54,7 @@ longer accurate. v0.0.1 now includes:
 - v0.0.3: history/diff UX and scan management.
 - v0.1.0: `netviz-probe` headless scanner that emits JSON and can optionally
   report to a server.
-- v0.1.5: server ingest mode and Docker image at `ghcr.io/spilloid/netviz`.
+- v0.1.5: server ingest mode and Docker image at `ghcr.io/spillers-technology/netviz`.
 - v0.1.9: hosted/server model with multi-tenancy, probe enrollment, and tokens.
 - v0.2.0: polish, hardening, performance, accessibility, and docs.
 

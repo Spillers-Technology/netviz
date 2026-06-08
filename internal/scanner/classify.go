@@ -3,7 +3,7 @@ package scanner
 import (
 	"strings"
 
-	"github.com/spilloid/netviz/internal/model"
+	"github.com/Spillers-Technology/netviz/internal/model"
 )
 
 func ClassifyHost(host model.HostObservation) string {

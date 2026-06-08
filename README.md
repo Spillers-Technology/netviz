@@ -19,7 +19,7 @@ No agents. No accounts. No Nmap. Just download and run.
 ## Download
 
 Grab the latest build for your platform from the
-**[Releases page](https://github.com/spilloid/netviz/releases/latest)** — the
+**[Releases page](https://github.com/Spillers-Technology/netviz/releases/latest)** — the
 desktop app is ready to run, no toolchain required.
 
 | Platform | Download | Run |
@@ -151,7 +151,7 @@ Future consumers    Headless probe reporter · server ingest endpoint
 - **v0.0.3** — history/diff UX and scan management
 - **v0.1.0** — `netviz-probe` headless scanner that emits JSON
 - **v0.1.5** — single-tenant server ingest + Docker image at
-  `ghcr.io/spilloid/netviz`
+  `ghcr.io/spillers-technology/netviz`
 - **v0.1.9** — multi-tenant hosted/server mode with probe enrollment
 - **v0.2.0** — performance, accessibility, and docs
 
