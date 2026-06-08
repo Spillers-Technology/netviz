@@ -1,4 +1,5 @@
 # NetViz
+<img width="1448" height="1086" alt="image" src="https://github.com/user-attachments/assets/1ee86036-d72d-4979-b68d-cf8503af0db4" />
 
 NetViz is a modern FOSS LAN scanner and network visualization tool. It is built
 around a native Go TCP-connect scanner, a typed event stream, and a Wails desktop
