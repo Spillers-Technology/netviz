@@ -171,6 +171,9 @@ See [MILESTONES.md](MILESTONES.md) for acceptance criteria.
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
+Product release notes for v0.0.1 are in
+[RELEASE_NOTES_v0.0.1.md](RELEASE_NOTES_v0.0.1.md).
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

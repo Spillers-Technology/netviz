@@ -43,3 +43,6 @@ Known limitations:
 - Server/probe ingest is not implemented yet.
 - Installers/signing/notarization are not polished yet.
 - This is not a vulnerability scanner, RMM, credential tool, or Nmap wrapper.
+
+See [RELEASE_NOTES_v0.0.1.md](RELEASE_NOTES_v0.0.1.md) for product-facing
+release notes.

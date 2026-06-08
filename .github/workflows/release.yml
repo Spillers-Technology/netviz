@@ -124,8 +124,14 @@ jobs:
   build-windows:
     name: Build release (Windows)
     runs-on: [self-hosted, Windows]
+    env:
+      RUNNER_TOOL_CACHE: C:\actions-toolcache
+      AGENT_TOOLSDIRECTORY: C:\actions-toolcache
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare tool cache
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force $env:RUNNER_TOOL_CACHE | Out-Null
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.x"

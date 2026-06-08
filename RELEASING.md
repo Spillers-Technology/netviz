@@ -29,6 +29,11 @@ Each release runner should be able to install or run:
 The Linux Docker publishing workflow also requires Docker/Buildx support on a
 `self-hosted`, `Linux` runner.
 
+Windows runners must use a tool cache path without spaces. The workflows set
+`RUNNER_TOOL_CACHE` and `AGENT_TOOLSDIRECTORY` to `C:\actions-toolcache` for
+Windows jobs because setup actions can fail when the runner lives under paths
+such as `C:\Program Files\...`.
+
 ## Release Assets
 
 When a GitHub Release is published, `.github/workflows/release.yml` builds and
