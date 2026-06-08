@@ -1,8 +1,9 @@
 # NetViz
 
-NetViz is a modern LAN scanner and network visualization project. The first
-release focuses on a small, useful desktop scanner: enter a CIDR, start a
-bounded TCP-connect scan, and watch host observations stream into a table.
+NetViz is a modern FOSS LAN scanner and network visualization tool. It is built
+around a native Go TCP-connect scanner, a typed event stream, and a Wails desktop
+app that turns scan results into tables, maps, hierarchy nodes, history, and
+exports.
 
 NetViz is not an Nmap wrapper, vulnerability scanner, remote shell, credential
 tool, or RMM platform. It intentionally avoids raw packet scanning, SYN scans,
@@ -10,20 +11,40 @@ remote command execution, and credential handling.
 
 > Safety note: only scan networks you own or are explicitly authorized to scan.
 
-## Screenshot
+## Current Release: v0.0.1
 
-Screenshot placeholder: the v0.0.1 UI is a table-first Wails desktop shell.
+v0.0.1 is the first desktop release candidate. The scope is broader than the
+original table-only plan because the visual layer became central to the product.
 
-## Current Status
+Included:
 
-Early project scaffold with working foundations through v0.0.3:
+- Wails desktop app for macOS local testing.
+- CIDR validation and bounded native Go TCP-connect scanning.
+- Live event stream from scanner core to UI and CLI.
+- Start, cancel, and monitor scan controls.
+- Monitor mode that rescans periodically and marks devices as new, online,
+  offline, changed, or stable.
+- Table view with IP, hostname, MAC, vendor, alive status, open ports, device
+  type, and timestamps.
+- Graph view grouped by inferred device category.
+- Hierarchy view with a firewall/root node, compact device circles, click-to-
+  inspect details, and checked-only filtering.
+- Checked-only dead addresses hidden by default across the main views.
+- File menu actions for opening saved scan data, saving scan data, and saving
+  CSV.
+- SQLite local history with latest-run diff support.
+- CLI parity for scan JSON events, saved scan history, and latest diff.
+- Placeholder server and Docker image path for future probe/server mode.
+- Self-hosted GitHub Actions for CI, Docker, desktop, and release assets.
+- Static `/docs` landing page for GitHub Pages.
 
-- Reusable Go scanner core with JSON scan events.
-- Minimal CLI that scans a CIDR and prints JSON events.
-- Wails desktop shell with table, graph, history, and latest-diff views.
-- SQLite local history for completed desktop scans.
-- Placeholder Go server and Dockerfile for future probe/server mode.
-- GitHub Actions for Go, frontend, Docker, and desktop build paths.
+Still rough in v0.0.1:
+
+- The visualizations are useful but still early.
+- Device type classification is intentionally simple.
+- MAC/vendor enrichment is best-effort from the local ARP cache.
+- Server/probe ingest is placeholder only.
+- Packaging is functional but not yet polished for end users.
 
 ## Quick Start: Desktop
 
@@ -35,45 +56,51 @@ Prerequisites:
 
 ```sh
 go test ./...
+npm ci --prefix desktop/frontend
 cd desktop
-npm install --prefix frontend
 wails dev
 ```
-
-The desktop app validates CIDR input and exposes only the fixed scanner
-configuration needed for the v0.0.1 LAN scan workflow.
 
 Packaged desktop build:
 
 ```sh
 make build-desktop
+open desktop/build/bin/netviz.app
 ```
 
 ## Quick Start: CLI
 
+Print JSON scan events:
+
 ```sh
-go run ./cmd/netviz-cli -cidr 192.168.1.0/24
+go run ./cmd/netviz-cli scan -cidr 192.168.1.0/24
 ```
 
-Each scan event is printed as one JSON object per line.
+Save a scan to local SQLite history:
+
+```sh
+./bin/netviz-cli scan -cidr 192.168.1.0/24 -save
+./bin/netviz-cli history
+./bin/netviz-cli diff
+```
+
+The CLI uses the same scanner core and history model as the desktop app.
 
 ## Quick Start: Server Docker Image
 
-The Docker image runs the server mode, not the Wails desktop app.
+The Docker image runs server mode, not the Wails desktop app. Server ingest is
+planned for a later release; v0.0.1 exposes placeholders.
 
 ```sh
 docker run -p 8080:8080 ghcr.io/spilloid/netviz
 ```
 
-For local development:
+Server v0.0.1 currently provides:
 
-```sh
-make docker-build
-make docker-run
-```
-
-Server v0.0.1 currently provides `/healthz`, `/api/version`, `/api/scans`, and a
-placeholder web UI at `/`.
+- `/healthz`
+- `/api/version`
+- `/api/scans`
+- `/`
 
 ## Development Setup
 
@@ -83,24 +110,26 @@ make lint
 make build-cli
 make build-server
 make build-probe
-```
-
-Desktop:
-
-```sh
-npm install --prefix desktop/frontend
-npm run --prefix desktop/frontend build
 make build-desktop
 ```
 
-Frontend placeholder builds:
+Frontend builds:
 
 ```sh
-npm install --prefix web
+npm ci --prefix web
 npm run --prefix web build
-npm install --prefix desktop/frontend
+npm ci --prefix desktop/frontend
 npm run --prefix desktop/frontend build
 ```
+
+## Releases
+
+GitHub Actions are configured for self-hosted runners only. Publishing a GitHub
+Release triggers Linux, Windows, and macOS release builds when matching
+self-hosted runners are available, then attaches platform archives and SHA-256
+checksums to the release.
+
+See [RELEASING.md](RELEASING.md).
 
 ## Architecture
 
@@ -110,21 +139,37 @@ The project is built around one rule:
 ScanEngine -> EventBus -> Consumers
 ```
 
-Consumers can be the desktop table UI, future graph UI, JSON exporter, CSV
-exporter, SQLite writer, HTTP reporter, server ingest endpoint, or future
-websocket streamer. The scanner core must stay reusable outside Wails.
+Current consumers:
+
+- desktop table view
+- desktop grouped graph view
+- desktop hierarchy visualization
+- JSON event CLI
+- File-backed scan save/open and CSV save
+- SQLite history and diff storage
+
+Future consumers:
+
+- headless probe reporter
+- server ingest endpoint
+- web UI latest-state view
+- websocket event streamer
+
+The scanner core must stay reusable outside Wails.
 
 ## Roadmap Summary
 
-- v0.0.1: standalone desktop scanner with live table and export
-- v0.0.2: graph/tree visualization
-- v0.0.3: local scan history and diffs
+- v0.0.1: desktop scanner, live monitoring, visualizations, history, CLI parity
+- v0.0.2: visual polish, interaction quality, packaging, release hardening
+- v0.0.3: history/diff UX improvements and scan management
 - v0.1.0: headless probe
-- v0.1.5: server ingest and Docker image
-- v0.1.9: smarter hosted/server mode
-- v0.2.0: polish and hardening
+- v0.1.5: single-tenant server ingest and Docker-hosted web UI
+- v0.1.9: multi-tenant hosted/server mode
+- v0.2.0: polish, performance, accessibility, and docs
 
 See [MILESTONES.md](MILESTONES.md) for acceptance criteria.
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 

@@ -9,6 +9,7 @@ const (
 	EventHostSeen         ScanEventType = "host_seen"
 	EventHostAlive        ScanEventType = "host_alive"
 	EventHostnameResolved ScanEventType = "hostname_resolved"
+	EventHostEnriched     ScanEventType = "host_enriched"
 	EventPortOpen         ScanEventType = "port_open"
 	EventDeviceClassified ScanEventType = "device_classified"
 	EventHostDone         ScanEventType = "host_done"

@@ -21,12 +21,18 @@ var DefaultPortDefs = []PortDef{
 	{443, "https"},
 	{445, "smb"},
 	{515, "lpd"},
+	{554, "rtsp"},
 	{631, "ipp"},
+	{1883, "mqtt"},
+	{32400, "plex"},
 	{9100, "jetdirect"},
 	{3389, "rdp"},
 	{5900, "vnc"},
+	{8000, "http-alt"},
 	{8080, "http-alt"},
+	{8123, "home-assistant"},
 	{8443, "https-alt"},
+	{8888, "http-alt"},
 }
 
 func DefaultPorts() []int {

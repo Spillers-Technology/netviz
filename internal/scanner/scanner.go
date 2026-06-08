@@ -73,6 +73,7 @@ func (s *Scanner) run(ctx context.Context, out chan<- model.ScanEvent, scanID st
 	}
 
 	jobs := make(chan string)
+	arpResolver := NewARPResolver()
 	var checked atomic.Int64
 	var wg sync.WaitGroup
 	for i := 0; i < workerCount; i++ {
@@ -80,7 +81,7 @@ func (s *Scanner) run(ctx context.Context, out chan<- model.ScanEvent, scanID st
 		go func() {
 			defer wg.Done()
 			for ip := range jobs {
-				s.scanHost(ctx, out, scanID, ip, ports, len(hosts), &checked)
+				s.scanHost(ctx, out, scanID, ip, ports, len(hosts), &checked, arpResolver)
 			}
 		}()
 	}
@@ -110,7 +111,7 @@ func (s *Scanner) run(ctx context.Context, out chan<- model.ScanEvent, scanID st
 	emit(context.Background(), out, finished)
 }
 
-func (s *Scanner) scanHost(ctx context.Context, out chan<- model.ScanEvent, scanID string, ip string, ports []int, totalHosts int, checked *atomic.Int64) {
+func (s *Scanner) scanHost(ctx context.Context, out chan<- model.ScanEvent, scanID string, ip string, ports []int, totalHosts int, checked *atomic.Int64, arpResolver *ARPResolver) {
 	now := time.Now().UTC()
 	obs := model.HostObservation{
 		IP:         ip,
@@ -139,7 +140,6 @@ func (s *Scanner) scanHost(ctx context.Context, out chan<- model.ScanEvent, scan
 		}
 	}
 
-	openPortInts := make([]int, 0)
 	aliveEmitted := false
 	for _, port := range ports {
 		if ctx.Err() != nil {
@@ -160,7 +160,6 @@ func (s *Scanner) scanHost(ctx context.Context, out chan<- model.ScanEvent, scan
 
 			portObs := model.PortObservation{Port: port, Service: ServiceName(port)}
 			obs.OpenPorts = append(obs.OpenPorts, portObs)
-			openPortInts = append(openPortInts, port)
 			event := newEvent(scanID, model.EventPortOpen)
 			event.IP = ip
 			event.Port = &portObs
@@ -171,7 +170,29 @@ func (s *Scanner) scanHost(ctx context.Context, out chan<- model.ScanEvent, scan
 		}
 	}
 
-	obs.DeviceType = ClassifyDevice(openPortInts)
+	if entry, ok := arpResolver.Lookup(ctx, ip); ok {
+		obs.MACAddress = entry.MACAddress
+		obs.Vendor = entry.Vendor
+		obs.Alive = true
+		obs.LastUpdate = time.Now().UTC()
+		if !aliveEmitted {
+			alive := newEvent(scanID, model.EventHostAlive)
+			alive.IP = ip
+			alive.Host = cloneHost(obs)
+			if !emit(ctx, out, alive) {
+				return
+			}
+			aliveEmitted = true
+		}
+		enriched := newEvent(scanID, model.EventHostEnriched)
+		enriched.IP = ip
+		enriched.Host = cloneHost(obs)
+		if !emit(ctx, out, enriched) {
+			return
+		}
+	}
+
+	obs.DeviceType = ClassifyHost(obs)
 	obs.LastUpdate = time.Now().UTC()
 	classified := newEvent(scanID, model.EventDeviceClassified)
 	classified.IP = ip

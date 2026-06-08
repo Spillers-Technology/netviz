@@ -34,6 +34,7 @@ input {
 .tabs,
 .tableWrap,
 .graphWrap,
+.hierarchyWrap,
 .historyWrap {
   border: 1px solid #d8d8d8;
   border-radius: 8px;
@@ -45,6 +46,32 @@ input {
   align-items: end;
   gap: 8px;
   padding: 12px;
+}
+
+.fileMenu {
+  position: relative;
+}
+
+.fileMenuList {
+  position: absolute;
+  z-index: 20;
+  top: 40px;
+  left: 0;
+  min-width: 150px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid #d8d8d8;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+
+.fileMenuList button {
+  width: 100%;
+  justify-content: start;
+  text-align: left;
+  border-color: transparent;
 }
 
 .field {
@@ -122,6 +149,7 @@ button.primary:hover:not(:disabled),
 
 .tableWrap,
 .graphWrap,
+.hierarchyWrap,
 .historyWrap {
   overflow: auto;
 }
@@ -163,16 +191,37 @@ tr:hover td {
 
 .graphWrap {
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 16px;
   padding: 16px;
 }
 
+.networkMap {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 16px;
+  min-height: 520px;
+}
+
 .graphRoot {
-  display: flex;
+  position: relative;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
   align-items: center;
   justify-content: center;
   border-right: 1px solid #e6e6e6;
+}
+
+.graphRoot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -16px;
+  width: 16px;
+  height: 2px;
+  background: #b9d7f2;
 }
 
 .rootNode {
@@ -184,19 +233,41 @@ tr:hover td {
   background: #0f6cbd;
   color: #ffffff;
   font-weight: 700;
+  border: 0;
+  padding: 0;
+}
+
+.graphMeta {
+  display: grid;
+  gap: 3px;
+  color: #5f5f5f;
+  font-size: 12px;
+  text-align: center;
 }
 
 .graphGroups {
   display: grid;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
   gap: 12px;
+  align-content: start;
 }
 
 .graphGroup {
+  position: relative;
   min-height: 160px;
   border: 1px solid #e2e2e2;
   border-radius: 8px;
   overflow: hidden;
+}
+
+.graphGroup::before {
+  content: "";
+  position: absolute;
+  top: 28px;
+  left: -13px;
+  width: 13px;
+  height: 2px;
+  background: #b9d7f2;
 }
 
 .groupHeader {
@@ -215,16 +286,48 @@ tr:hover td {
 }
 
 .deviceNode {
+  width: 100%;
   display: grid;
   gap: 4px;
   padding: 8px;
   border: 1px solid #d6e6f8;
   border-radius: 8px;
   background: #f7fbff;
+  text-align: left;
+  height: auto;
+  min-height: 86px;
+}
+
+.deviceNode.quietNode {
+  border-color: #dedede;
+  background: #fbfbfb;
+}
+
+.deviceNode.selected {
+  border-color: #0f6cbd;
+  box-shadow: 0 0 0 2px rgba(15, 108, 189, 0.14);
+}
+
+.deviceNode.state-new,
+.deviceNode.state-online {
+  border-color: #16805f;
+  background: #f2fbf7;
+}
+
+.deviceNode.state-offline {
+  border-color: #d6d6d6;
+  background: #f8f8f8;
+  opacity: 0.72;
+}
+
+.deviceNode.state-changed {
+  border-color: #c58a00;
+  background: #fff8e8;
 }
 
 .deviceTitle,
-.deviceIP {
+.deviceIP,
+.deviceState {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -235,10 +338,15 @@ tr:hover td {
 }
 
 .deviceIP,
+.deviceState,
 .quiet,
 .emptyGroup {
   color: #6a6a6a;
   font-size: 12px;
+}
+
+.deviceState {
+  color: #4d4d4d;
 }
 
 .badges {
@@ -255,6 +363,317 @@ tr:hover td {
   color: #0f548c;
   font-size: 12px;
   text-align: center;
+}
+
+.detailPanel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  background: #fbfbfb;
+}
+
+.detailHeader {
+  display: grid;
+  gap: 6px;
+}
+
+.detailBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detailBadges > span {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e9f3ff;
+  color: #0f548c;
+  font-size: 12px;
+}
+
+.statePill {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eeeeee;
+  color: #4d4d4d;
+  font-size: 12px;
+}
+
+.statePill.new,
+.statePill.online {
+  background: #e7f7ee;
+  color: #106b45;
+}
+
+.statePill.offline {
+  background: #f1f1f1;
+  color: #666666;
+}
+
+.statePill.changed {
+  background: #fff2cc;
+  color: #8a6100;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.detailGrid div {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.detailGrid dt {
+  color: #6a6a6a;
+  font-size: 12px;
+}
+
+.detailGrid dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.portsPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.portsPanel p {
+  margin: 0;
+  color: #6a6a6a;
+  font-size: 13px;
+}
+
+.portList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.portList span {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.portList b {
+  color: #0f548c;
+}
+
+.portList em {
+  color: #6a6a6a;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.hierarchyWrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  padding: 16px;
+}
+
+.hierarchyCanvas {
+  min-height: 620px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 10px;
+}
+
+.hierarchyToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hierarchyToolbar div {
+  display: grid;
+  gap: 2px;
+}
+
+.hierarchyToolbar span,
+.hiddenNote {
+  color: #6a6a6a;
+  font-size: 12px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: #424242;
+}
+
+.toggle.compact {
+  height: 34px;
+  padding: 0 8px;
+}
+
+.toggle input {
+  width: 16px;
+  height: 16px;
+}
+
+.radialMap {
+  position: relative;
+  min-height: 620px;
+  border: 1px solid #e4e4e4;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at center, rgba(15, 108, 189, 0.08), transparent 28%),
+    linear-gradient(#ffffff, #fbfbfb);
+  overflow: hidden;
+}
+
+.edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.edges line {
+  stroke: #d6e6f8;
+  stroke-width: 1.1;
+}
+
+.firewallNode {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: #0f6cbd;
+  color: #ffffff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 10px 30px rgba(15, 108, 189, 0.24);
+}
+
+.firewallNode span {
+  font-weight: 700;
+}
+
+.firewallNode b {
+  font-size: 12px;
+}
+
+.circleNode {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #9aa7b2;
+  color: #ffffff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+.circleNode:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+  z-index: 3;
+}
+
+.circleNode.selected {
+  outline: 3px solid rgba(15, 108, 189, 0.28);
+  z-index: 4;
+}
+
+.circleNode.state-new,
+.circleNode.state-online {
+  outline: 3px solid rgba(22, 128, 95, 0.22);
+}
+
+.circleNode.state-offline {
+  opacity: 0.46;
+  filter: grayscale(1);
+}
+
+.circleNode.state-changed {
+  outline: 3px solid rgba(197, 138, 0, 0.28);
+}
+
+.circleNode span {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.circleNode b {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  min-width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #0f548c;
+  font-size: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.circleNode.firewall-network {
+  background: #0f6cbd;
+}
+
+.circleNode.windows-smb {
+  background: #2563eb;
+}
+
+.circleNode.linux-iot {
+  background: #16805f;
+}
+
+.circleNode.apple {
+  background: #5f6b7a;
+}
+
+.circleNode.printer {
+  background: #b45f06;
+}
+
+.circleNode.camera-media {
+  background: #8a4bd9;
+}
+
+.circleNode.web-appliance {
+  background: #0f8a9d;
+}
+
+.circleNode.unknown {
+  background: #b6b6b6;
+}
+
+.hiddenNote {
+  justify-self: end;
 }
 
 .historyWrap {
@@ -338,4 +757,3 @@ h4 {
   grid-template-columns: repeat(3, minmax(140px, 1fr));
   gap: 12px;
 }
-

@@ -25,6 +25,8 @@ type HostChange struct {
 	Before            HostObservation `json:"before"`
 	After             HostObservation `json:"after"`
 	HostnameChanged   bool            `json:"hostname_changed"`
+	MACChanged        bool            `json:"mac_changed"`
+	VendorChanged     bool            `json:"vendor_changed"`
 	PortsChanged      bool            `json:"ports_changed"`
 	DeviceTypeChanged bool            `json:"device_type_changed"`
 }

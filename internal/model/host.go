@@ -10,6 +10,8 @@ type PortObservation struct {
 type HostObservation struct {
 	IP         string            `json:"ip"`
 	Hostname   string            `json:"hostname,omitempty"`
+	MACAddress string            `json:"mac_address,omitempty"`
+	Vendor     string            `json:"vendor,omitempty"`
 	Alive      bool              `json:"alive"`
 	OpenPorts  []PortObservation `json:"open_ports"`
 	DeviceType string            `json:"device_type"`

@@ -1,72 +1,103 @@
 # MILESTONES
 
-## v0.0.1: Desktop Scanner/Table Release
+## v0.0.1: Desktop Scanner and Visualization Release
 
-Goal: ship the first useful standalone desktop LAN scanner.
+Goal: release the first useful standalone desktop scanner with live visual
+network awareness.
+
+Status: current release target.
 
 Features:
 
 - Wails desktop app.
 - CIDR input with validation.
-- Start and cancel scan.
-- Native Go TCP-connect scan of common ports.
-- Live scan events.
-- Table columns for IP, hostname, alive, open ports, device type, first seen,
-  and last updated.
-- JSON and CSV export of current results.
+- Start, cancel, and monitor scan controls.
+- Native Go TCP-connect scan of constrained LAN-oriented default ports.
+- Best-effort hostname resolution.
+- Best-effort MAC/vendor enrichment from the local ARP cache.
+- Live typed scan events.
+- Table view with IP, hostname, MAC, vendor, alive status, open ports, guessed
+  device type, first seen, and last updated.
+- Grouped graph view with clickable device details.
+- Hierarchy visualization with firewall/root node, compact device circles,
+  click-to-inspect details, and checked-only filtering.
+- Monitor mode that marks devices as new, online, offline, changed, or stable.
+- Checked-only dead addresses hidden by default across the main views.
+- File menu save/open for scan data and CSV save.
+- SQLite local history and latest-run diff.
+- CLI JSON event output.
+- CLI saved history and latest diff commands.
+- Placeholder server endpoints and Docker build path.
+- Self-hosted GitHub Actions release artifact workflow.
 
 Non-goals:
 
-- Graph view.
-- SQLite history.
-- Probe/server ingest.
-- Auth or multi-tenancy.
-- Raw packet, SYN, vuln, credential, or remote execution features.
+- Raw packet scanning.
+- SYN scans.
+- Vulnerability scanning.
+- Remote shell.
+- Remote command execution.
+- Credential handling.
+- RMM-like workflows.
+- Server ingest.
+- Multi-tenancy.
+- Probe enrollment.
 
 Acceptance criteria:
 
 - `go test ./...` passes.
+- `go vet ./...` passes.
+- Desktop frontend builds.
+- Wails desktop app builds locally.
 - CLI emits JSON scan events for a CIDR.
-- Desktop shell can start and cancel a scan.
-- Results update live in a table.
-- Current results export to JSON and CSV.
+- Desktop can start, cancel, and monitor scans.
+- Visualizations update from live scan events.
+- Hierarchy view remains usable for a `/24` scan.
+- Current results save to scan data and CSV files.
+- Scan runs persist locally and latest diff works.
+- Release workflow can attach platform artifacts when self-hosted runners exist.
 
-## v0.0.2: Visualization Release
+## v0.0.2: Visual Polish and Release Hardening
 
-Goal: add the differentiating graph/tree view after the scanner/table workflow is
-clean.
+Goal: make the v0.0.1 experience feel intentional, stable, and shippable for
+early FOSS users.
 
 Features:
 
-- Graph/tree tab.
-- Nodes appear as devices are discovered.
-- Port badges attach to nodes.
-- Device categories: router/network, windows/smb, linux/ssh, printer, web
-  appliance, and unknown.
-- Hide inactive/dead IPs by default.
+- Better hierarchy layout density for hundreds of devices.
+- Better visual states for new, online, offline, and changed devices.
+- Device detail panel refinements.
+- Port/service filtering and grouping in visual views.
+- Clearer loading, empty, cancelled, and monitor states.
+- First-run guidance without turning the app into a landing page.
+- macOS packaging polish and release notes.
+- Screenshot assets for README and GitHub Pages.
 
 Non-goals:
 
-- Historical diffing.
-- Server ingest.
+- Probe/server ingest.
 - Multi-tenancy.
+- Vulnerability scanning.
 
 Acceptance criteria:
 
-- Table and graph are both driven by the same scan event stream.
-- Graph remains responsive during a `/24` LAN scan.
-- Users can switch between table and graph without losing scan state.
+- A `/24` scan remains responsive in table, graph, and hierarchy views.
+- Users can quickly hide checked-only/offline noise.
+- Release artifacts are attached to GitHub Releases from self-hosted runners.
+- README and `/docs` reflect the actual release.
 
-## v0.0.3: Scan History/Diff Release
+## v0.0.3: History, Diff, and Scan Management
 
-Goal: add local history and comparison.
+Goal: make local history genuinely useful rather than just persisted data.
 
 Features:
 
-- SQLite local history.
-- Persist scan runs and host observations.
-- Compare current scan to previous scan.
-- Show new devices, missing devices, changed ports, and hostname changes.
+- Scan history management UI.
+- Clear previous-scan comparison view.
+- New devices, missing devices, changed ports, hostname changes, MAC/vendor
+  changes, and device type changes.
+- Optional history reset.
+- Export previous scan/diff.
 
 Non-goals:
 
@@ -76,12 +107,10 @@ Non-goals:
 
 Acceptance criteria:
 
-- Scan runs persist locally.
-- Diff view clearly separates new, missing, and changed hosts.
-- History can be disabled or reset.
-
-Initial scaffold status: SQLite scan-run persistence and latest-run diffing are
-implemented. A reset/management UI is still future polish.
+- Users can browse prior runs.
+- Users can compare selected runs, not only latest two.
+- Diff results are visible in table and visual views.
+- History can be reset intentionally.
 
 ## v0.1.0: Headless Probe
 
@@ -93,6 +122,7 @@ Features:
 - Scans configured CIDR(s).
 - Outputs JSON.
 - Optional POST to a server URL.
+- Reuses scanner events and host observation model.
 
 Non-goals:
 
@@ -106,9 +136,9 @@ Acceptance criteria:
 - Probe output uses the same event/observation model.
 - POST reporting is optional and documented.
 
-## v0.1.5: Server Ingest/Docker Release
+## v0.1.5: Server Ingest and Docker Web UI
 
-Goal: add single-tenant server ingest and a container image.
+Goal: add single-tenant server ingest and a useful containerized web UI.
 
 Features:
 
@@ -116,7 +146,7 @@ Features:
 - Docker image published to `ghcr.io/spilloid/netviz`.
 - Server receives scan observations from probes.
 - Server stores scan runs and host observations.
-- Server renders latest state in a web UI.
+- Server renders latest state in a React web UI.
 
 Non-goals:
 
@@ -167,6 +197,7 @@ Features:
 - Accessibility pass.
 - Documentation examples.
 - Release checklist.
+- More robust vendor enrichment strategy.
 
 Non-goals:
 

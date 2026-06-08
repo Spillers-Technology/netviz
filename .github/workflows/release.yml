@@ -72,11 +72,54 @@ jobs:
           fi
           cp README.md LICENSE MILESTONES.md "dist/netviz/"
           tar -C dist -czf "${{ steps.meta.outputs.asset }}" netviz
+          shasum -a 256 "${{ steps.meta.outputs.asset }}" > "${{ steps.meta.outputs.asset }}.sha256"
       - name: Upload release asset
-        shell: bash
+        uses: actions/github-script@v7
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ steps.meta.outputs.tag }}" "${{ steps.meta.outputs.asset }}" --clobber
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          ASSET_PATHS: |
+            ${{ steps.meta.outputs.asset }}
+            ${{ steps.meta.outputs.asset }}.sha256
+        with:
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const { owner, repo } = context.repo;
+            const tag = process.env.RELEASE_TAG;
+            const assetPaths = process.env.ASSET_PATHS.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+
+            let release = context.payload.release;
+            if (!release) {
+              const response = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+              release = response.data;
+            }
+
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
+              owner,
+              repo,
+              release_id: release.id,
+            });
+
+            for (const assetPath of assetPaths) {
+              const name = path.basename(assetPath);
+              const existing = assets.find((asset) => asset.name === name);
+              if (existing) {
+                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: existing.id });
+              }
+
+              const data = fs.readFileSync(assetPath);
+              await github.rest.repos.uploadReleaseAsset({
+                owner,
+                repo,
+                release_id: release.id,
+                name,
+                data,
+                headers: {
+                  "content-type": "application/octet-stream",
+                  "content-length": data.length,
+                },
+              });
+            }
 
   build-windows:
     name: Build release (Windows)
@@ -129,8 +172,52 @@ jobs:
           Copy-Item desktop/build/bin/* dist/netviz/desktop/ -Recurse -Force
           Copy-Item README.md,LICENSE,MILESTONES.md dist/netviz/ -Force
           Compress-Archive -Path dist/netviz -DestinationPath "${{ steps.meta.outputs.asset }}" -Force
+          $hash = Get-FileHash "${{ steps.meta.outputs.asset }}" -Algorithm SHA256
+          "$($hash.Hash.ToLowerInvariant())  ${{ steps.meta.outputs.asset }}" | Out-File "${{ steps.meta.outputs.asset }}.sha256" -Encoding ascii
       - name: Upload release asset
-        shell: pwsh
+        uses: actions/github-script@v7
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ steps.meta.outputs.tag }}" "${{ steps.meta.outputs.asset }}" --clobber
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          ASSET_PATHS: |
+            ${{ steps.meta.outputs.asset }}
+            ${{ steps.meta.outputs.asset }}.sha256
+        with:
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const { owner, repo } = context.repo;
+            const tag = process.env.RELEASE_TAG;
+            const assetPaths = process.env.ASSET_PATHS.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+
+            let release = context.payload.release;
+            if (!release) {
+              const response = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+              release = response.data;
+            }
+
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
+              owner,
+              repo,
+              release_id: release.id,
+            });
+
+            for (const assetPath of assetPaths) {
+              const name = path.basename(assetPath);
+              const existing = assets.find((asset) => asset.name === name);
+              if (existing) {
+                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: existing.id });
+              }
+
+              const data = fs.readFileSync(assetPath);
+              await github.rest.repos.uploadReleaseAsset({
+                owner,
+                repo,
+                release_id: release.id,
+                name,
+                data,
+                headers: {
+                  "content-type": "application/octet-stream",
+                  "content-length": data.length,
+                },
+              });
+            }

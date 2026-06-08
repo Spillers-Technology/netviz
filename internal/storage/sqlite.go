@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/spilloid/netviz/internal/model"
@@ -72,10 +73,12 @@ func (s *SQLiteStore) SaveScanRun(ctx context.Context, run model.ScanRun, hosts 
 	}
 
 	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO host_observations (run_id, ip, hostname, alive, device_type, first_seen, last_updated, open_ports_json)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO host_observations (run_id, ip, hostname, mac_address, vendor, alive, device_type, first_seen, last_updated, open_ports_json)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(run_id, ip) DO UPDATE SET
 			hostname = excluded.hostname,
+			mac_address = excluded.mac_address,
+			vendor = excluded.vendor,
 			alive = excluded.alive,
 			device_type = excluded.device_type,
 			first_seen = excluded.first_seen,
@@ -92,7 +95,7 @@ func (s *SQLiteStore) SaveScanRun(ctx context.Context, run model.ScanRun, hosts 
 		if err != nil {
 			return err
 		}
-		if _, err := stmt.ExecContext(ctx, run.ID, host.IP, host.Hostname, host.Alive, host.DeviceType, formatTime(host.FirstSeen), formatTime(host.LastUpdate), string(portsJSON)); err != nil {
+		if _, err := stmt.ExecContext(ctx, run.ID, host.IP, host.Hostname, host.MACAddress, host.Vendor, host.Alive, host.DeviceType, formatTime(host.FirstSeen), formatTime(host.LastUpdate), string(portsJSON)); err != nil {
 			return err
 		}
 	}
@@ -128,7 +131,7 @@ func (s *SQLiteStore) ListScanRuns(ctx context.Context, limit int) ([]model.Scan
 
 func (s *SQLiteStore) HostsForRun(ctx context.Context, runID string) ([]model.HostObservation, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT ip, hostname, alive, device_type, first_seen, last_updated, open_ports_json
+		SELECT ip, hostname, mac_address, vendor, alive, device_type, first_seen, last_updated, open_ports_json
 		FROM host_observations
 		WHERE run_id = ?
 		ORDER BY ip
@@ -189,10 +192,12 @@ func DiffHosts(baseRunID string, compareRunID string, baseHosts []model.HostObse
 			Before:            before,
 			After:             after,
 			HostnameChanged:   before.Hostname != after.Hostname,
+			MACChanged:        before.MACAddress != after.MACAddress,
+			VendorChanged:     before.Vendor != after.Vendor,
 			PortsChanged:      !samePorts(before.OpenPorts, after.OpenPorts),
 			DeviceTypeChanged: before.DeviceType != after.DeviceType,
 		}
-		if change.HostnameChanged || change.PortsChanged || change.DeviceTypeChanged {
+		if change.HostnameChanged || change.MACChanged || change.VendorChanged || change.PortsChanged || change.DeviceTypeChanged {
 			diff.ChangedHosts = append(diff.ChangedHosts, change)
 		}
 	}
@@ -229,6 +234,8 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 			run_id TEXT NOT NULL,
 			ip TEXT NOT NULL,
 			hostname TEXT NOT NULL,
+			mac_address TEXT NOT NULL DEFAULT '',
+			vendor TEXT NOT NULL DEFAULT '',
 			alive INTEGER NOT NULL,
 			device_type TEXT NOT NULL,
 			first_seen TEXT NOT NULL,
@@ -240,7 +247,19 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 
 		CREATE INDEX IF NOT EXISTS idx_scan_runs_started_at ON scan_runs(started_at DESC);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+
+	for _, stmt := range []string{
+		`ALTER TABLE host_observations ADD COLUMN mac_address TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE host_observations ADD COLUMN vendor TEXT NOT NULL DEFAULT ''`,
+	} {
+		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			return err
+		}
+	}
+	return nil
 }
 
 type scanRunScanner interface {
@@ -266,7 +285,7 @@ func hostFromRows(row scanRunScanner) (model.HostObservation, error) {
 	var host model.HostObservation
 	var firstSeen, lastUpdated, portsJSON string
 	var alive bool
-	err := row.Scan(&host.IP, &host.Hostname, &alive, &host.DeviceType, &firstSeen, &lastUpdated, &portsJSON)
+	err := row.Scan(&host.IP, &host.Hostname, &host.MACAddress, &host.Vendor, &alive, &host.DeviceType, &firstSeen, &lastUpdated, &portsJSON)
 	if err != nil {
 		return host, err
 	}

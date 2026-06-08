@@ -91,7 +91,8 @@
           <p>
             NetViz discovers hosts on an authorized CIDR, TCP-connect scans a
             small default port set, resolves names when possible, and streams
-            results into table, graph, history, and export consumers.
+            results into table, graph, hierarchy, monitor, history, and export
+            consumers.
           </p>
         </div>
         <ul class="checks" aria-label="Project boundaries">
@@ -105,8 +106,8 @@
         <div>
           <h2>Try it locally</h2>
           <p>
-            The first useful path is the Mac desktop app, with CLI parity for
-            event output, saved scan history, and latest-run diffs.
+            The v0.0.1 path is the desktop app, with CLI parity for event
+            output, saved scan history, and latest-run diffs.
           </p>
         </div>
         <pre><code>go test ./...
@@ -123,16 +124,16 @@ cd desktop && wails dev</code></pre>
           <span>Desktop UI</span>
           <span>CLI JSON</span>
           <span>SQLite history</span>
-          <span>Future probe/server</span>
+          <span>Monitor mode</span>
         </div>
       </section>
 
       <section id="roadmap" class="band roadmap">
         <h2>Roadmap</h2>
         <ol>
-          <li><b>v0.0.1</b><span>Desktop scanner with live table and export.</span></li>
-          <li><b>v0.0.2</b><span>Graph/tree visualization as devices appear.</span></li>
-          <li><b>v0.0.3</b><span>SQLite history and scan diffs.</span></li>
+          <li><b>v0.0.1</b><span>Desktop scanner with table, graph, hierarchy, monitor, export, and history.</span></li>
+          <li><b>v0.0.2</b><span>Visual polish, packaging, screenshots, and release hardening.</span></li>
+          <li><b>v0.0.3</b><span>History/diff UX and scan management.</span></li>
           <li><b>v0.1.x</b><span>Headless probe, server ingest, Docker image.</span></li>
         </ol>
       </section>
