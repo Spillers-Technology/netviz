@@ -1,0 +1,136 @@
+name: Release Builds
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to upload assets to
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-unix:
+    name: Build release (${{ matrix.os }})
+    runs-on: [self-hosted, "${{ matrix.os }}"]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [Linux, macOS]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          if [ -z "$tag" ]; then
+            tag="${{ inputs.tag }}"
+          fi
+          goos="$(go env GOOS)"
+          goarch="$(go env GOARCH)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "goos=$goos" >> "$GITHUB_OUTPUT"
+          echo "goarch=$goarch" >> "$GITHUB_OUTPUT"
+          echo "asset=netviz-${tag}-${goos}-${goarch}.tar.gz" >> "$GITHUB_OUTPUT"
+      - name: Build Go binaries
+        shell: bash
+        run: |
+          mkdir -p dist/bin
+          go build -o dist/bin/netviz-cli ./cmd/netviz-cli
+          go build -o dist/bin/netviz-server ./cmd/netviz-server
+          go build -o dist/bin/netviz-probe ./cmd/netviz-probe
+      - name: Build desktop app
+        shell: bash
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+          npm ci --prefix desktop/frontend
+          npm run --prefix desktop/frontend build
+          export PATH="$HOME/go/bin:$PATH"
+          (cd desktop && wails build)
+      - name: Stage archive
+        shell: bash
+        run: |
+          mkdir -p "dist/netviz"
+          cp -R dist/bin "dist/netviz/bin"
+          mkdir -p "dist/netviz/desktop"
+          if [ "${{ steps.meta.outputs.goos }}" = "darwin" ]; then
+            cp -R desktop/build/bin/netviz.app "dist/netviz/desktop/"
+          else
+            cp -R desktop/build/bin/. "dist/netviz/desktop/"
+          fi
+          cp README.md LICENSE MILESTONES.md "dist/netviz/"
+          tar -C dist -czf "${{ steps.meta.outputs.asset }}" netviz
+      - name: Upload release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ steps.meta.outputs.tag }}" "${{ steps.meta.outputs.asset }}" --clobber
+
+  build-windows:
+    name: Build release (Windows)
+    runs-on: [self-hosted, Windows]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Resolve release metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.release.tag_name }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            $tag = "${{ inputs.tag }}"
+          }
+          $goos = go env GOOS
+          $goarch = go env GOARCH
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "goos=$goos" >> $env:GITHUB_OUTPUT
+          "goarch=$goarch" >> $env:GITHUB_OUTPUT
+          "asset=netviz-$tag-$goos-$goarch.zip" >> $env:GITHUB_OUTPUT
+      - name: Build Go binaries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/bin | Out-Null
+          go build -o dist/bin/netviz-cli.exe ./cmd/netviz-cli
+          go build -o dist/bin/netviz-server.exe ./cmd/netviz-server
+          go build -o dist/bin/netviz-probe.exe ./cmd/netviz-probe
+      - name: Build desktop app
+        shell: pwsh
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+          npm ci --prefix desktop/frontend
+          npm run --prefix desktop/frontend build
+          $env:PATH = "$env:USERPROFILE\go\bin;$env:PATH"
+          Push-Location desktop
+          wails build
+          Pop-Location
+      - name: Stage archive
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/netviz/bin | Out-Null
+          New-Item -ItemType Directory -Force dist/netviz/desktop | Out-Null
+          Copy-Item dist/bin/* dist/netviz/bin/ -Recurse -Force
+          Copy-Item desktop/build/bin/* dist/netviz/desktop/ -Recurse -Force
+          Copy-Item README.md,LICENSE,MILESTONES.md dist/netviz/ -Force
+          Compress-Archive -Path dist/netviz -DestinationPath "${{ steps.meta.outputs.asset }}" -Force
+      - name: Upload release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ steps.meta.outputs.tag }}" "${{ steps.meta.outputs.asset }}" --clobber

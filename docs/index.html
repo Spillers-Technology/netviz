@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="NetViz is a modern FOSS LAN scanner and network visualization tool built with Go, Wails, React, and an event-first scanner architecture."
+    />
+    <title>NetViz | Modern LAN Scanner</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar" aria-label="Primary">
+      <a class="brand" href="#top" aria-label="NetViz home">
+        <span class="mark" aria-hidden="true"></span>
+        <span>NetViz</span>
+      </a>
+      <nav>
+        <a href="#status">Status</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#roadmap">Roadmap</a>
+        <a href="https://github.com/spilloid/netviz">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="scanScene" aria-hidden="true">
+          <div class="scanHeader">
+            <span>192.168.1.0/24</span>
+            <span class="state">scanning</span>
+          </div>
+          <div class="scanRail">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="scanGrid">
+            <div class="node router">
+              <b>Router</b>
+              <span>192.168.1.1</span>
+              <i>53</i><i>80</i><i>443</i>
+            </div>
+            <div class="node web">
+              <b>Web appliance</b>
+              <span>192.168.1.18</span>
+              <i>80</i><i>8443</i>
+            </div>
+            <div class="node linux">
+              <b>SSH device</b>
+              <span>192.168.1.42</span>
+              <i>22</i>
+            </div>
+            <div class="node printer">
+              <b>Printer</b>
+              <span>192.168.1.64</span>
+              <i>631</i><i>9100</i>
+            </div>
+            <div class="node smb">
+              <b>Windows or SMB</b>
+              <span>192.168.1.91</span>
+              <i>445</i><i>3389</i>
+            </div>
+          </div>
+          <div class="scanTable">
+            <span>IP</span><span>Hostname</span><span>Open ports</span><span>Type</span>
+            <span>192.168.1.1</span><span>gateway.local</span><span>53, 80, 443</span><span>router/network</span>
+            <span>192.168.1.64</span><span>printer.local</span><span>631, 9100</span><span>printer</span>
+            <span>192.168.1.91</span><span>studio-pc</span><span>445, 3389</span><span>windows/smb</span>
+          </div>
+        </div>
+
+        <div class="heroCopy">
+          <p class="eyebrow">FOSS LAN scanner</p>
+          <h1 id="hero-title">NetViz</h1>
+          <p>
+            A modern desktop scanner for seeing what is on your local network,
+            built around a native Go scan engine and live event stream.
+          </p>
+          <div class="heroActions">
+            <a class="button primary" href="https://github.com/spilloid/netviz">View on GitHub</a>
+            <a class="button" href="#quickstart">Quick start</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="status" class="band intro">
+        <div>
+          <h2>Focused by design</h2>
+          <p>
+            NetViz discovers hosts on an authorized CIDR, TCP-connect scans a
+            small default port set, resolves names when possible, and streams
+            results into table, graph, history, and export consumers.
+          </p>
+        </div>
+        <ul class="checks" aria-label="Project boundaries">
+          <li>Not an Nmap wrapper</li>
+          <li>No raw packet or SYN scanning</li>
+          <li>No vuln scanning or remote command execution</li>
+        </ul>
+      </section>
+
+      <section id="quickstart" class="band split">
+        <div>
+          <h2>Try it locally</h2>
+          <p>
+            The first useful path is the Mac desktop app, with CLI parity for
+            event output, saved scan history, and latest-run diffs.
+          </p>
+        </div>
+        <pre><code>go test ./...
+make build-cli
+./bin/netviz-cli scan -cidr 192.168.1.0/24 -save
+cd desktop && wails dev</code></pre>
+      </section>
+
+      <section id="architecture" class="band">
+        <h2>Event-first architecture</h2>
+        <div class="pipeline" aria-label="Architecture pipeline">
+          <span>ScanEngine</span>
+          <strong>EventBus</strong>
+          <span>Desktop UI</span>
+          <span>CLI JSON</span>
+          <span>SQLite history</span>
+          <span>Future probe/server</span>
+        </div>
+      </section>
+
+      <section id="roadmap" class="band roadmap">
+        <h2>Roadmap</h2>
+        <ol>
+          <li><b>v0.0.1</b><span>Desktop scanner with live table and export.</span></li>
+          <li><b>v0.0.2</b><span>Graph/tree visualization as devices appear.</span></li>
+          <li><b>v0.0.3</b><span>SQLite history and scan diffs.</span></li>
+          <li><b>v0.1.x</b><span>Headless probe, server ingest, Docker image.</span></li>
+        </ol>
+      </section>
+    </main>
+
+    <footer>
+      <span>MIT licensed.</span>
+      <span>Only scan networks you own or are authorized to scan.</span>
+    </footer>
+
+    <script>
+      const nodes = document.querySelectorAll(".node");
+      let active = 0;
+      setInterval(() => {
+        nodes[active].classList.remove("active");
+        active = (active + 1) % nodes.length;
+        nodes[active].classList.add("active");
+      }, 1600);
+      nodes[0].classList.add("active");
+    </script>
+  </body>
+</html>

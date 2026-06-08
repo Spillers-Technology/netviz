@@ -1,0 +1,61 @@
+name: Desktop
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-unix:
+    name: Build desktop (${{ matrix.os }})
+    runs-on: [self-hosted, "${{ matrix.os }}"]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [Linux, macOS]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Wails CLI
+        shell: bash
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+      - name: Build frontend
+        shell: bash
+        run: |
+          npm ci --prefix desktop/frontend
+          npm run --prefix desktop/frontend build
+      - name: Wails build path
+        working-directory: desktop
+        shell: bash
+        run: |
+          export PATH="$HOME/go/bin:$PATH"
+          wails build
+
+  build-windows:
+    name: Build desktop (Windows)
+    runs-on: [self-hosted, Windows]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Wails CLI
+        shell: pwsh
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+      - name: Build frontend
+        shell: pwsh
+        run: |
+          npm ci --prefix desktop/frontend
+          npm run --prefix desktop/frontend build
+      - name: Wails build path
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:USERPROFILE\go\bin;$env:PATH"
+          wails build

@@ -1,0 +1,345 @@
+package storage
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"time"
+
+	"github.com/spilloid/netviz/internal/model"
+	_ "modernc.org/sqlite"
+)
+
+type SQLiteStore struct {
+	db *sql.DB
+}
+
+func OpenSQLite(path string) (*SQLiteStore, error) {
+	if path == "" {
+		return nil, fmt.Errorf("SQLite path is required")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, err
+	}
+	store := &SQLiteStore{db: db}
+	if err := store.migrate(context.Background()); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return store, nil
+}
+
+func (s *SQLiteStore) Close() error {
+	return s.db.Close()
+}
+
+func (s *SQLiteStore) SaveScanRun(ctx context.Context, run model.ScanRun, hosts []model.HostObservation) error {
+	if run.ID == "" {
+		return fmt.Errorf("scan run ID is required")
+	}
+	run.HostCount, run.AliveCount, run.OpenPortCount = summarizeHosts(hosts)
+	if run.EndedAt.IsZero() {
+		run.EndedAt = time.Now().UTC()
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO scan_runs (id, cidr, started_at, ended_at, host_count, alive_count, open_port_count)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			cidr = excluded.cidr,
+			started_at = excluded.started_at,
+			ended_at = excluded.ended_at,
+			host_count = excluded.host_count,
+			alive_count = excluded.alive_count,
+			open_port_count = excluded.open_port_count
+	`, run.ID, run.CIDR, formatTime(run.StartedAt), formatTime(run.EndedAt), run.HostCount, run.AliveCount, run.OpenPortCount)
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO host_observations (run_id, ip, hostname, alive, device_type, first_seen, last_updated, open_ports_json)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(run_id, ip) DO UPDATE SET
+			hostname = excluded.hostname,
+			alive = excluded.alive,
+			device_type = excluded.device_type,
+			first_seen = excluded.first_seen,
+			last_updated = excluded.last_updated,
+			open_ports_json = excluded.open_ports_json
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, host := range hosts {
+		portsJSON, err := json.Marshal(host.OpenPorts)
+		if err != nil {
+			return err
+		}
+		if _, err := stmt.ExecContext(ctx, run.ID, host.IP, host.Hostname, host.Alive, host.DeviceType, formatTime(host.FirstSeen), formatTime(host.LastUpdate), string(portsJSON)); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (s *SQLiteStore) ListScanRuns(ctx context.Context, limit int) ([]model.ScanRun, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, cidr, started_at, ended_at, host_count, alive_count, open_port_count
+		FROM scan_runs
+		ORDER BY started_at DESC
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var runs []model.ScanRun
+	for rows.Next() {
+		run, err := scanRunFromRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		runs = append(runs, run)
+	}
+	return runs, rows.Err()
+}
+
+func (s *SQLiteStore) HostsForRun(ctx context.Context, runID string) ([]model.HostObservation, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT ip, hostname, alive, device_type, first_seen, last_updated, open_ports_json
+		FROM host_observations
+		WHERE run_id = ?
+		ORDER BY ip
+	`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hosts []model.HostObservation
+	for rows.Next() {
+		host, err := hostFromRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		hosts = append(hosts, host)
+	}
+	return hosts, rows.Err()
+}
+
+func (s *SQLiteStore) DiffLatest(ctx context.Context) (*model.ScanDiff, error) {
+	runs, err := s.ListScanRuns(ctx, 2)
+	if err != nil {
+		return nil, err
+	}
+	if len(runs) < 2 {
+		return &model.ScanDiff{}, nil
+	}
+	return s.DiffRuns(ctx, runs[1].ID, runs[0].ID)
+}
+
+func (s *SQLiteStore) DiffRuns(ctx context.Context, baseRunID string, compareRunID string) (*model.ScanDiff, error) {
+	baseHosts, err := s.HostsForRun(ctx, baseRunID)
+	if err != nil {
+		return nil, err
+	}
+	compareHosts, err := s.HostsForRun(ctx, compareRunID)
+	if err != nil {
+		return nil, err
+	}
+	diff := DiffHosts(baseRunID, compareRunID, baseHosts, compareHosts)
+	return &diff, nil
+}
+
+func DiffHosts(baseRunID string, compareRunID string, baseHosts []model.HostObservation, compareHosts []model.HostObservation) model.ScanDiff {
+	base := hostsByIP(baseHosts)
+	compare := hostsByIP(compareHosts)
+
+	diff := model.ScanDiff{BaseRunID: baseRunID, CompareRunID: compareRunID}
+	for ip, after := range compare {
+		before, ok := base[ip]
+		if !ok {
+			diff.NewHosts = append(diff.NewHosts, after)
+			continue
+		}
+		change := model.HostChange{
+			IP:                ip,
+			Before:            before,
+			After:             after,
+			HostnameChanged:   before.Hostname != after.Hostname,
+			PortsChanged:      !samePorts(before.OpenPorts, after.OpenPorts),
+			DeviceTypeChanged: before.DeviceType != after.DeviceType,
+		}
+		if change.HostnameChanged || change.PortsChanged || change.DeviceTypeChanged {
+			diff.ChangedHosts = append(diff.ChangedHosts, change)
+		}
+	}
+	for ip, before := range base {
+		if _, ok := compare[ip]; !ok {
+			diff.MissingHosts = append(diff.MissingHosts, before)
+		}
+	}
+
+	sortHosts(diff.NewHosts)
+	sortHosts(diff.MissingHosts)
+	sort.Slice(diff.ChangedHosts, func(i, j int) bool {
+		return diff.ChangedHosts[i].IP < diff.ChangedHosts[j].IP
+	})
+	return diff
+}
+
+func (s *SQLiteStore) migrate(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `
+		PRAGMA journal_mode = WAL;
+		PRAGMA foreign_keys = ON;
+
+		CREATE TABLE IF NOT EXISTS scan_runs (
+			id TEXT PRIMARY KEY,
+			cidr TEXT NOT NULL,
+			started_at TEXT NOT NULL,
+			ended_at TEXT NOT NULL,
+			host_count INTEGER NOT NULL,
+			alive_count INTEGER NOT NULL,
+			open_port_count INTEGER NOT NULL
+		);
+
+		CREATE TABLE IF NOT EXISTS host_observations (
+			run_id TEXT NOT NULL,
+			ip TEXT NOT NULL,
+			hostname TEXT NOT NULL,
+			alive INTEGER NOT NULL,
+			device_type TEXT NOT NULL,
+			first_seen TEXT NOT NULL,
+			last_updated TEXT NOT NULL,
+			open_ports_json TEXT NOT NULL,
+			PRIMARY KEY (run_id, ip),
+			FOREIGN KEY (run_id) REFERENCES scan_runs(id) ON DELETE CASCADE
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_scan_runs_started_at ON scan_runs(started_at DESC);
+	`)
+	return err
+}
+
+type scanRunScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanRunFromRows(row scanRunScanner) (model.ScanRun, error) {
+	var run model.ScanRun
+	var startedAt, endedAt string
+	err := row.Scan(&run.ID, &run.CIDR, &startedAt, &endedAt, &run.HostCount, &run.AliveCount, &run.OpenPortCount)
+	if err != nil {
+		return run, err
+	}
+	run.StartedAt, err = parseTime(startedAt)
+	if err != nil {
+		return run, err
+	}
+	run.EndedAt, err = parseTime(endedAt)
+	return run, err
+}
+
+func hostFromRows(row scanRunScanner) (model.HostObservation, error) {
+	var host model.HostObservation
+	var firstSeen, lastUpdated, portsJSON string
+	var alive bool
+	err := row.Scan(&host.IP, &host.Hostname, &alive, &host.DeviceType, &firstSeen, &lastUpdated, &portsJSON)
+	if err != nil {
+		return host, err
+	}
+	host.Alive = alive
+	host.FirstSeen, err = parseTime(firstSeen)
+	if err != nil {
+		return host, err
+	}
+	host.LastUpdate, err = parseTime(lastUpdated)
+	if err != nil {
+		return host, err
+	}
+	err = json.Unmarshal([]byte(portsJSON), &host.OpenPorts)
+	return host, err
+}
+
+func summarizeHosts(hosts []model.HostObservation) (hostCount int, aliveCount int, openPortCount int) {
+	hostCount = len(hosts)
+	for _, host := range hosts {
+		if host.Alive {
+			aliveCount++
+		}
+		openPortCount += len(host.OpenPorts)
+	}
+	return hostCount, aliveCount, openPortCount
+}
+
+func hostsByIP(hosts []model.HostObservation) map[string]model.HostObservation {
+	byIP := make(map[string]model.HostObservation, len(hosts))
+	for _, host := range hosts {
+		byIP[host.IP] = host
+	}
+	return byIP
+}
+
+func samePorts(a []model.PortObservation, b []model.PortObservation) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	ap := make([]int, len(a))
+	bp := make([]int, len(b))
+	for i := range a {
+		ap[i] = a[i].Port
+	}
+	for i := range b {
+		bp[i] = b[i].Port
+	}
+	sort.Ints(ap)
+	sort.Ints(bp)
+	for i := range ap {
+		if ap[i] != bp[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func sortHosts(hosts []model.HostObservation) {
+	sort.Slice(hosts, func(i, j int) bool {
+		return hosts[i].IP < hosts[j].IP
+	})
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339Nano)
+}
+
+func parseTime(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+	return time.Parse(time.RFC3339Nano, value)
+}

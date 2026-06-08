@@ -1,0 +1,9 @@
+services:
+  netviz:
+    image: ghcr.io/spilloid/netviz:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "8080:8080"
+
