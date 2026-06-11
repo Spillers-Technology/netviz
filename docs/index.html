@@ -5,7 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="NetViz is a free, open-source LAN scanner and network visualizer for Windows, macOS, and Linux. Download, scan, and see every device on your network live."
+      content="NetViz is a free, open-source LAN scanner and network visualizer for Windows, macOS, and Linux. Scan a CIDR, watch devices stream in live, and explore them as a table, grouped graph, and hierarchy map — with monitor mode, local history, and diffs."
+    />
+    <meta property="og:title" content="NetViz | Free LAN Scanner &amp; Network Visualizer" />
+    <meta
+      property="og:description"
+      content="Scan. Map. Monitor. Repeat. A modern, open-source LAN scanner with live visualizations, monitor mode, local history, and CLI parity."
     />
     <title>NetViz | Free LAN Scanner &amp; Network Visualizer</title>
     <link rel="stylesheet" href="styles.css" />
@@ -19,6 +24,8 @@
       <nav>
         <a href="#download">Download</a>
         <a href="#features">Features</a>
+        <a href="#views">Views</a>
+        <a href="#cli">CLI</a>
         <a href="#architecture">Architecture</a>
         <a href="#roadmap">Roadmap</a>
         <a href="https://github.com/Spillers-Technology/netviz">GitHub</a>
@@ -73,12 +80,13 @@
         </div>
 
         <div class="heroCopy">
-          <p class="eyebrow">Free &amp; open-source LAN scanner</p>
+          <p class="eyebrow">Scan. Map. Monitor. Repeat.</p>
           <h1 id="hero-title">NetViz</h1>
           <p>
-            See every device on your local network in seconds. Download, hit
-            scan, and watch results stream in as tables, a grouped graph, and a
-            clickable hierarchy map. Windows, macOS, and Linux.
+            A free, open-source LAN scanner and network visualizer. Enter a
+            CIDR, hit scan, and watch every device on your network stream in
+            live — as a precise table, a grouped graph, and a clickable
+            hierarchy map. Windows, macOS, and Linux.
           </p>
           <div class="heroActions">
             <a class="button primary" href="#download">Download for free</a>
@@ -121,31 +129,147 @@
         </p>
       </section>
 
-      <section id="features" class="band intro">
-        <div>
-          <h2>One scan, three views</h2>
-          <p>
-            NetViz discovers hosts on an authorized CIDR, TCP-connect scans a
-            focused set of common LAN ports, resolves names and vendors when it
-            can, and streams everything into a precise table, a grouped graph,
-            and a hierarchy map. Monitor mode re-scans on an interval and flags
-            devices as new, online, offline, changed, or stable.
-          </p>
+      <section id="features" class="band features">
+        <h2>Everything from one scan</h2>
+        <p class="lede">
+          NetViz validates your CIDR, runs a bounded native-Go TCP-connect scan
+          of common LAN ports, enriches what it finds, and streams every
+          observation into the views, exports, and history — all from the same
+          live event stream.
+        </p>
+        <div class="featureGrid">
+          <article class="feature">
+            <h3>Live discovery</h3>
+            <p>
+              Results appear as hosts are checked — no waiting for the sweep to
+              finish. Cancel any time; scans stay responsive on a full
+              <code>/24</code>.
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Best-effort enrichment</h3>
+            <p>
+              Hostname resolution plus MAC address and vendor lookup from your
+              local ARP cache, with a conservative device-type guess for every
+              host.
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Monitor mode</h3>
+            <p>
+              Re-scans on an interval and flags every device so you can watch
+              the network move:
+            </p>
+            <p class="chips" aria-label="Monitor states">
+              <span class="chip new">new</span>
+              <span class="chip online">online</span>
+              <span class="chip offline">offline</span>
+              <span class="chip changed">changed</span>
+              <span class="chip stable">stable</span>
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Device details on click</h3>
+            <p>
+              Click any device in the graph or hierarchy for a detail panel
+              with IP, hostname, MAC, vendor, device type, and open ports.
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Save, open &amp; export</h3>
+            <p>
+              Save scans as versioned NetViz JSON and reopen them later, or
+              export the table to CSV — straight from the File menu.
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Local history &amp; diff</h3>
+            <p>
+              Completed scans land in a local SQLite database. The History tab
+              compares the two latest runs and shows exactly which devices are
+              new or missing.
+            </p>
+          </article>
         </div>
-        <ul class="checks" aria-label="Project boundaries">
-          <li>Not an Nmap wrapper</li>
-          <li>No raw packet or SYN scanning</li>
-          <li>No vuln scanning or remote command execution</li>
-        </ul>
       </section>
 
-      <section id="quickstart" class="band split">
+      <section id="views" class="band views">
+        <h2>Four ways to read your network</h2>
+        <div class="viewGrid">
+          <article class="view">
+            <h3>Table</h3>
+            <p>
+              The precise operational view: IP, hostname, MAC, vendor, alive
+              status, open ports, device type, first seen, and last updated.
+              Dead addresses are hidden by default — flip
+              <code>Show checked-only</code> to see every probe.
+            </p>
+          </article>
+          <article class="view">
+            <h3>Graph</h3>
+            <p>
+              Devices grouped by inferred category — routers, printers,
+              Windows/SMB, SSH hosts, web appliances — with open-port badges
+              on every node.
+            </p>
+          </article>
+          <article class="view">
+            <h3>Hierarchy</h3>
+            <p>
+              A firewall/root node at the center with compact, clickable device
+              circles around it. Built to stay readable on dense
+              <code>/24</code> scans.
+            </p>
+          </article>
+          <article class="view">
+            <h3>History</h3>
+            <p>
+              Every saved run at a glance, plus a diff of the two most recent
+              scans: which devices appeared, and which went missing.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="scope" class="band split scope">
+        <div>
+          <h2>Focused on the ports that matter on a LAN</h2>
+          <p>
+            NetViz performs bounded TCP-connect checks against a constrained,
+            LAN-oriented default port set — enough to identify what a device
+            is, without behaving like an aggressive scanner.
+          </p>
+          <p class="chips ports" aria-label="Scanned services">
+            <span class="chip">SSH</span>
+            <span class="chip">HTTP / HTTPS</span>
+            <span class="chip">SMB</span>
+            <span class="chip">RDP</span>
+            <span class="chip">VNC</span>
+            <span class="chip">Printer (631 / 9100)</span>
+            <span class="chip">RTSP</span>
+            <span class="chip">MQTT</span>
+            <span class="chip">Plex</span>
+            <span class="chip">Alt web / admin</span>
+          </p>
+        </div>
+        <div class="boundaries">
+          <h3>Not Nmap. Not RMM. Just visibility.</h3>
+          <ul class="checks" aria-label="Project boundaries">
+            <li>Not an Nmap wrapper — a native Go scan engine</li>
+            <li>No raw packet or SYN scanning</li>
+            <li>No vulnerability scanning</li>
+            <li>No credential handling, remote shell, or remote execution</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="cli" class="band split">
         <div>
           <h2>Prefer the command line?</h2>
           <p>
             Every release bundles <code>netviz-cli</code>, which shares the same
             scan engine and local history store as the desktop app — scan,
-            save, list, and diff runs as JSON.
+            save, list, and diff runs as JSON. Pipe it, script it, cron it.
           </p>
         </div>
         <pre><code>netviz-cli scan -cidr 192.168.1.0/24
@@ -157,8 +281,9 @@ netviz-cli diff</code></pre>
       <section id="architecture" class="band">
         <h2>Event-first architecture</h2>
         <p>
-          A native Go scan engine emits a typed event stream that every view
-          consumes — the same data drives the UI, the CLI, and local history.
+          One rule: <code>ScanEngine → EventBus → Consumers</code>. The scanner
+          core has no dependency on the UI, server, or storage — every view,
+          export, and history record consumes the same typed event stream.
         </p>
         <div class="pipeline" aria-label="Architecture pipeline">
           <span>ScanEngine</span>
@@ -170,13 +295,39 @@ netviz-cli diff</code></pre>
         </div>
       </section>
 
+      <section id="foss" class="band split foss">
+        <div>
+          <h2>Free and open source, the boring-honest way</h2>
+          <p>
+            MIT licensed, written in Go with a Wails desktop shell. The history
+            store uses a pure-Go SQLite driver, so there's no CGO anywhere in
+            the build. Read the code, file an issue, or send a PR — the whole
+            scanner fits in your head.
+          </p>
+          <div class="heroActions">
+            <a class="button dark" href="https://github.com/Spillers-Technology/netviz">Star on GitHub</a>
+            <a class="button dark" href="https://github.com/Spillers-Technology/netviz/issues">Report an issue</a>
+          </div>
+        </div>
+        <img
+          class="mascot"
+          src="assets/netviz-mascot.jpg"
+          alt="NetViz mascot artwork: a penguin at a desk with the NetViz scan-map-monitor workflow"
+          loading="lazy"
+          width="960"
+          height="720"
+        />
+      </section>
+
       <section id="roadmap" class="band roadmap">
         <h2>Roadmap</h2>
         <ol>
-          <li><b>v0.0.1</b><span>Desktop scanner with table, graph, hierarchy, monitor, export, and history.</span></li>
+          <li class="current"><b>v0.0.1 — now</b><span>Desktop scanner with table, graph, hierarchy, monitor mode, exports, history, and CLI parity.</span></li>
           <li><b>v0.0.2</b><span>Visual polish, signed installers, screenshots, and release hardening.</span></li>
           <li><b>v0.0.3</b><span>History/diff UX and scan management.</span></li>
-          <li><b>v0.1.x</b><span>Headless probe, server ingest, Docker image.</span></li>
+          <li><b>v0.1.0</b><span><code>netviz-probe</code> headless scanner that emits JSON.</span></li>
+          <li><b>v0.1.5</b><span>Server ingest mode and a Docker image on GHCR.</span></li>
+          <li><b>v0.2.0</b><span>Performance, accessibility, hardening, and docs.</span></li>
         </ol>
       </section>
     </main>
