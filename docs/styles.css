@@ -14,6 +14,11 @@ html {
   scroll-behavior: smooth;
 }
 
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   min-width: 320px;
   margin: 0;
@@ -324,7 +329,6 @@ h1 {
 
 .downloadHead p {
   max-width: 720px;
-  color: rgba(255, 255, 255, 0.86);
 }
 
 .downloads {
@@ -379,7 +383,6 @@ h1 {
 .dlNote {
   max-width: 760px !important;
   margin-top: 22px !important;
-  color: rgba(255, 255, 255, 0.86) !important;
   font-size: 15px !important;
 }
 
@@ -492,6 +495,44 @@ h1 {
   color: #ffffff;
 }
 
+.views .vlede {
+  color: rgba(238, 245, 241, 0.78);
+}
+
+.views .vlede code {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.shot {
+  display: grid;
+  gap: 10px;
+  text-decoration: none;
+  color: rgba(238, 245, 241, 0.82);
+  font-size: 14px;
+  transition: transform 160ms ease;
+}
+
+.shot:hover {
+  transform: translateY(-3px);
+  color: #ffffff;
+}
+
+.shot img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.4);
+}
+
 .viewGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -557,7 +598,7 @@ h1 {
 
 .mascot {
   width: 100%;
-  max-width: 520px;
+  max-width: min(100%, 440px);
   height: auto;
   justify-self: end;
   border-radius: 12px;
@@ -576,6 +617,15 @@ h2 {
   color: #4b4b4b;
   font-size: 18px;
   line-height: 1.58;
+}
+
+.downloadBand p {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.downloadBand p code {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
 }
 
 .checks {
@@ -709,6 +759,10 @@ footer {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .shots {
+    grid-template-columns: 1fr;
+  }
+
   .mascot {
     justify-self: start;
   }
@@ -752,6 +806,7 @@ footer {
 
   .featureGrid,
   .viewGrid,
+  .shots,
   .pipeline,
   .roadmap ol {
     grid-template-columns: 1fr;
