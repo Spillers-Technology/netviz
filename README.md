@@ -103,6 +103,14 @@ netviz-probe -cidr 192.168.1.0/24 \
 # Run continuously: re-scan + push on an interval, with heartbeats in between
 netviz-probe -cidr 192.168.1.0/24 -interval 60s \
   -url https://rmm.example.com -key <probe-api-key>
+
+# Install the same configuration as an OS service (run as Administrator/root)
+export NETVIZ_MATERIALTICKET_URL=https://rmm.example.com
+export NETVIZ_MATERIALTICKET_KEY=<probe-api-key>
+sudo --preserve-env=NETVIZ_MATERIALTICKET_URL,NETVIZ_MATERIALTICKET_KEY \
+  ./netviz-probe install -cidr 192.168.1.0/24 -interval 60s
+sudo ./netviz-probe start
+sudo ./netviz-probe status
 ```
 
 | Flag | Purpose |
@@ -113,6 +121,11 @@ netviz-probe -cidr 192.168.1.0/24 -interval 60s \
 | `-interval` | Heartbeat / re-scan interval (default `1m`) |
 | `-once` | Scan once, push, and exit instead of running continuously |
 
+Service commands are `install`, `start`, `stop`, `restart`, `status`, and
+`uninstall`. The same binary registers a native Windows service, systemd unit,
+or launchd daemon. Put the binary in its permanent location before installing
+because the service registration points to that exact path.
+
 The URL and key can come from the environment (`NETVIZ_MATERIALTICKET_URL`,
 `NETVIZ_MATERIALTICKET_KEY`), which keeps the key out of process listings and
 shell history. The API key is issued once when an admin registers the probe in
@@ -120,6 +133,9 @@ MaterialTicket. After each scan the probe `POST`s its devices to `/probe/devices
 (upsert-keyed, so re-scans don't duplicate) and keeps itself marked online via
 periodic `/probe/heartbeat`. A failed push is retried on the next cycle, not
 dropped. The probe has no desktop, Wails, or UI dependencies.
+
+See [PROBE_DEPLOYMENT.md](PROBE_DEPLOYMENT.md) for complete Windows, Linux, and
+macOS install, logging, upgrade, and troubleshooting instructions.
 
 ---
 
@@ -182,11 +198,11 @@ Future consumers    Server ingest endpoint · web UI latest-state view
 ## Roadmap
 
 - **v0.0.1** — desktop scanner, live monitoring, visualizations, history, CLI
-  parity *(current)*
+  parity
 - **v0.0.2** — visual polish, packaging, signed installers, screenshots
 - **v0.0.3** — history/diff UX and scan management
 - **v0.1.0** — `netviz-probe` headless scanner with MaterialTicket device push
-  and heartbeat reporting *(in progress)*
+  and heartbeat reporting *(current)*
 - **v0.1.5** — single-tenant server ingest + Docker image at
   `ghcr.io/spillers-technology/netviz`
 - **v0.1.9** — multi-tenant hosted/server mode with probe enrollment

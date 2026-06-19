@@ -2,8 +2,9 @@
 
 NetViz GitHub Actions are intentionally self-hosted only.
 
-v0.0.1 is the first desktop release target. Release artifacts should be treated
-as early FOSS builds: useful for local testing, not yet polished installers.
+Release artifacts are early FOSS builds. The desktop app is not yet a polished
+signed installer; `netviz-probe` is a native binary with built-in service
+registration.
 
 ## Required Runner Labels
 
@@ -48,21 +49,27 @@ Each archive contains:
 
 - CLI binary
 - server binary
-- probe placeholder binary
+- headless probe binary with native service management
 - desktop build output for that platform
-- README, LICENSE, and milestone notes
+- README, LICENSE, changelog, probe deployment guide, and milestone notes
 
 The workflow also supports manual dispatch with a `tag` input to rebuild assets
 for an existing release.
 
-## v0.0.1 Checklist
+## v0.1.0 Checklist
 
 - `go test ./...`
 - `go vet ./...`
 - `npm run --prefix desktop/frontend build`
 - `npm run --prefix web build`
 - `wails build` on available desktop platforms
-- Smoke test CLI scan JSON events
-- Smoke test desktop scan, monitor mode, graph, hierarchy, export, and history
+- Build `netviz-probe` for Windows, Linux, and macOS
+- Install/start/status/stop/uninstall the probe on each release platform
+- Run the probe twice against MaterialTicket and confirm the first ingest
+  creates devices while the second updates the same devices without duplicates
+- Confirm a bad probe key produces a useful non-2xx error
+- Confirm platform service logs contain push and heartbeat results
 - Confirm release notes mention authorized-use-only scanning
-- Confirm [CHANGELOG.md](CHANGELOG.md) has the v0.0.1 notes
+- Confirm [CHANGELOG.md](CHANGELOG.md) has the v0.1.0 notes
+- Confirm [PROBE_DEPLOYMENT.md](PROBE_DEPLOYMENT.md) matches the shipped
+  service commands

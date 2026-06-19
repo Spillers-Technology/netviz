@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.1.0 (in progress)
+## v0.1.0 — 2026-06-19
 
 Adds the first `netviz-probe` headless scanner and its MaterialTicket
 integration. A netviz instance deployed on a customer LAN can now act as a
@@ -24,6 +24,15 @@ Added:
   fallbacks that keep the API key out of process listings and shell history.
 - Bounded-backoff retry that holds undelivered records for the next cycle
   instead of dropping them.
+- Inventory filtering that skips never-responsive CIDR addresses while still
+  reporting previously observed devices as down on later scans.
+- Native service management through the probe binary: `install`, `start`,
+  `stop`, `restart`, `status`, and `uninstall` register and control a Windows
+  service, Linux systemd unit, or macOS launchd daemon.
+- Cross-platform deployment guide covering credentials, host-network
+  requirements, logging, upgrades, and troubleshooting.
+- Transport and retry tests for authentication headers, heartbeat/device
+  payloads, non-2xx responses, held batches, merge behavior, and backoff reset.
 
 Notes:
 
@@ -33,7 +42,7 @@ Notes:
   Keep `internal/materialticket` in lockstep with its normalizer, or bump the
   contract version on both sides together.
 - Standalone stdout JSON output and live per-device status streaming are not
-  implemented yet.
+  v0.1.0 features.
 
 ## v0.0.1
 

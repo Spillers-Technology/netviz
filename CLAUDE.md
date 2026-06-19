@@ -55,9 +55,12 @@ longer accurate. v0.0.1 now includes:
 - v0.0.2: visual polish, packaging, release hardening, screenshots, and UX
   cleanup.
 - v0.0.3: history/diff UX and scan management.
-- v0.1.0: `netviz-probe` headless scanner that pushes device records to a
-  MaterialTicket backend with heartbeat reporting (standalone JSON output still
-  pending). In progress.
+- v0.1.0: `netviz-probe` always-on LAN probe that pushes device inventory to a
+  MaterialTicket backend with heartbeat reporting, installable as a Windows
+  service, systemd unit, or launchd job. Released June 19, 2026.
+- v0.1.x: desktop probe management — GUI installs/manages the headless probe
+  service and edits its shared config file; the service, not the GUI, runs the
+  report loop (fast-follow).
 - v0.1.5: server ingest mode and Docker image at `ghcr.io/spillers-technology/netviz`.
 - v0.1.9: hosted/server model with multi-tenancy, probe enrollment, and tokens.
 - v0.2.0: polish, hardening, performance, accessibility, and docs.

@@ -6,8 +6,6 @@ package main
 
 import (
 	"context"
-	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -19,15 +17,13 @@ import (
 	"github.com/Spillers-Technology/netviz/internal/materialticket"
 	"github.com/Spillers-Technology/netviz/internal/model"
 	"github.com/Spillers-Technology/netviz/internal/scanner"
+	"github.com/kardianos/service"
 )
 
 // Version is reported in heartbeats to MaterialTicket.
 const Version = "0.1.0"
 
 const (
-	envURL = "NETVIZ_MATERIALTICKET_URL"
-	envKey = "NETVIZ_MATERIALTICKET_KEY"
-
 	retryBaseDelay = 5 * time.Second
 	retryMaxDelay  = 5 * time.Minute
 )
@@ -40,100 +36,119 @@ func main() {
 }
 
 func run(args []string) error {
-	flags := flag.NewFlagSet("netviz-probe", flag.ExitOnError)
-	var (
-		cidr     string
-		url      string
-		key      string
-		interval time.Duration
-		once     bool
-	)
-	flags.StringVar(&cidr, "cidr", "", "IPv4 CIDR to scan, for example 192.168.1.0/24")
-	flags.StringVar(&url, "url", "", "MaterialTicket base URL (or "+envURL+")")
-	flags.StringVar(&key, "key", "", "MaterialTicket probe API key (or "+envKey+")")
-	flags.DurationVar(&interval, "interval", time.Minute, "heartbeat and continuous re-scan interval")
-	flags.BoolVar(&once, "once", false, "scan once, push, and exit instead of running continuously")
-	flags.Parse(args)
-
-	if url == "" {
-		url = os.Getenv(envURL)
-	}
-	if key == "" {
-		key = os.Getenv(envKey)
+	action := "run"
+	if len(args) > 0 && isCommand(args[0]) {
+		action = args[0]
+		args = args[1:]
 	}
 
-	if cidr == "" {
-		return errors.New("CIDR is required; use -cidr 192.168.1.0/24")
+	switch action {
+	case "version":
+		fmt.Println(Version)
+		return nil
+	case "install":
+		cfg, err := parseProbeConfig(action, args)
+		if err != nil {
+			return err
+		}
+		if cfg.once {
+			return fmt.Errorf("-once cannot be used when installing the service")
+		}
+		return controlService(action, cfg)
+	case "start", "stop", "restart", "status", "uninstall":
+		if len(args) != 0 {
+			return fmt.Errorf("%s does not accept probe flags; reinstall to change service configuration", action)
+		}
+		return controlService(action, probeConfig{})
+	case "run":
+		cfg, err := parseProbeConfig(action, args)
+		if err != nil {
+			return err
+		}
+		return runConfigured(cfg)
+	default:
+		return fmt.Errorf("unknown command %q", action)
 	}
-	if url == "" {
-		return fmt.Errorf("MaterialTicket URL is required; use -url or set %s", envURL)
+}
+
+func isCommand(value string) bool {
+	switch value {
+	case "run", "install", "uninstall", "start", "stop", "restart", "status", "version":
+		return true
+	default:
+		return false
 	}
-	if key == "" {
-		return fmt.Errorf("MaterialTicket probe key is required; use -key or set %s", envKey)
+}
+
+func runConfigured(cfg probeConfig) error {
+	program := &probeProgram{cfg: cfg}
+	svc, err := service.New(program, serviceDefinition(cfg))
+	if err != nil {
+		return fmt.Errorf("create service: %w", err)
 	}
-	if interval <= 0 {
-		interval = time.Minute
+
+	if !cfg.once && !service.Interactive() {
+		return svc.Run()
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	return runProbe(ctx, cfg, log.Printf)
+}
 
-	client := materialticket.NewClient(url, key, Version)
+func runProbe(ctx context.Context, cfg probeConfig, logf func(string, ...any)) error {
+	client := materialticket.NewClient(cfg.url, cfg.key, Version)
 
 	// pending holds records from a scan whose push failed, so we retry on the
 	// next cycle instead of dropping them.
-	var pending []materialticket.DeviceRecord
-	var backoff time.Duration
+	var delivery deliveryState
+	var inventory inventoryState
 
-	if !once {
-		go heartbeatLoop(ctx, client, cidr, interval)
+	if !cfg.once {
+		go heartbeatLoop(ctx, client, cfg.cidr, cfg.interval, logf)
 	}
 
-	scanAndPush := func() {
-		hosts, err := scan(ctx, cidr)
+	scanAndPush := func() error {
+		hosts, err := scan(ctx, cfg.cidr)
 		if err != nil {
-			if ctx.Err() == nil {
-				log.Printf("scan failed: %v", err)
-			}
-			return
+			return fmt.Errorf("scan failed: %w", err)
 		}
-		records := materialticket.ToDeviceRecords(hosts)
-		// Carry over anything we failed to deliver previously.
-		records = mergeRecords(pending, records)
-
-		result, err := client.SendDevices(ctx, records)
+		records := inventory.records(hosts)
+		if len(records) == 0 && len(delivery.pending) == 0 {
+			logf("scan found no reportable devices")
+			return nil
+		}
+		result, sent, err := delivery.send(ctx, client, records)
 		if err != nil {
-			if ctx.Err() != nil {
-				return
-			}
-			pending = records
-			backoff = nextBackoff(backoff)
-			log.Printf("push failed (%d records held for retry): %v", len(records), err)
-			return
+			return fmt.Errorf("push failed (%d records held for retry): %w", sent, err)
 		}
-		pending = nil
-		backoff = 0
-		log.Printf("pushed %d devices: received=%d created=%d updated=%d", len(records), result.Received, result.Created, result.Updated)
+		logf("pushed %d devices: received=%d created=%d updated=%d", sent, result.Received, result.Created, result.Updated)
 		for _, e := range result.Errors {
-			log.Printf("ingest error: %s", e)
+			logf("ingest error: %s", e)
 		}
-	}
-
-	scanAndPush()
-	if once {
 		return nil
 	}
 
+	err := scanAndPush()
+	if cfg.once {
+		return err
+	}
+	if err != nil && ctx.Err() == nil {
+		logf("%v", err)
+	}
+
 	for {
-		wait := interval
-		if backoff > 0 && backoff < wait {
-			wait = backoff
+		wait := cfg.interval
+		if delivery.backoff > 0 && delivery.backoff < wait {
+			wait = delivery.backoff
 		}
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-time.After(wait):
-			scanAndPush()
+			if err := scanAndPush(); err != nil && ctx.Err() == nil {
+				logf("%v", err)
+			}
 		}
 	}
 }
@@ -164,10 +179,17 @@ func scan(ctx context.Context, cidr string) ([]model.HostObservation, error) {
 }
 
 // heartbeatLoop reports liveness on a fixed interval until the context is done.
-func heartbeatLoop(ctx context.Context, client *materialticket.Client, cidr string, interval time.Duration) {
-	if err := client.Heartbeat(ctx, "online", cidr); err != nil && ctx.Err() == nil {
-		log.Printf("heartbeat failed: %v", err)
+func heartbeatLoop(ctx context.Context, client *materialticket.Client, cidr string, interval time.Duration, logf func(string, ...any)) {
+	send := func() {
+		if err := client.Heartbeat(ctx, "online", cidr); err != nil {
+			if ctx.Err() == nil {
+				logf("heartbeat failed: %v", err)
+			}
+			return
+		}
+		logf("heartbeat sent: status=online cidr=%s version=%s", cidr, Version)
 	}
+	send()
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -175,11 +197,31 @@ func heartbeatLoop(ctx context.Context, client *materialticket.Client, cidr stri
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := client.Heartbeat(ctx, "online", cidr); err != nil && ctx.Err() == nil {
-				log.Printf("heartbeat failed: %v", err)
-			}
+			send()
 		}
 	}
+}
+
+type deviceSender interface {
+	SendDevices(context.Context, []materialticket.DeviceRecord) (materialticket.IngestResult, error)
+}
+
+type deliveryState struct {
+	pending []materialticket.DeviceRecord
+	backoff time.Duration
+}
+
+func (d *deliveryState) send(ctx context.Context, sender deviceSender, fresh []materialticket.DeviceRecord) (materialticket.IngestResult, int, error) {
+	records := mergeRecords(d.pending, fresh)
+	result, err := sender.SendDevices(ctx, records)
+	if err != nil {
+		d.pending = records
+		d.backoff = nextBackoff(d.backoff)
+		return materialticket.IngestResult{}, len(records), err
+	}
+	d.pending = nil
+	d.backoff = 0
+	return result, len(records), nil
 }
 
 // mergeRecords overlays fresh records on top of held-over ones, keyed by record
