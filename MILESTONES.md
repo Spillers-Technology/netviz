@@ -114,27 +114,44 @@ Acceptance criteria:
 
 ## v0.1.0: Headless Probe
 
-Goal: provide a small headless scanner binary.
+Goal: provide a small headless scanner binary that can run unattended on a LAN
+and report what it finds.
+
+Status: in progress. `netviz-probe` is implemented with MaterialTicket device
+push and heartbeat reporting. Standalone stdout JSON output is still pending.
 
 Features:
 
-- `netviz-probe`.
-- Scans configured CIDR(s).
-- Outputs JSON.
-- Optional POST to a server URL.
-- Reuses scanner events and host observation model.
+- `netviz-probe` binary with no desktop, Wails, or UI dependencies.
+- Scans a configured CIDR using the shared scanner core and host observation
+  model.
+- MaterialTicket integration: `internal/materialticket` serializes scan results
+  to the MaterialTicket probe device contract (v1) and pushes them to
+  `POST /probe/devices` after each completed scan. Upsert-keyed so re-scans
+  update devices instead of duplicating them.
+- Periodic `POST /probe/heartbeat` liveness reporting that carries the probe
+  version and scanned CIDR.
+- Flag and environment configuration for the MaterialTicket URL and probe API
+  key (`-url`/`-key`, `NETVIZ_MATERIALTICKET_URL`/`NETVIZ_MATERIALTICKET_KEY`).
+- Continuous (interval) and `-once` run modes with graceful SIGINT/SIGTERM
+  shutdown.
+- In-memory retry with bounded backoff so a failed push is held for the next
+  cycle rather than dropped.
 
 Non-goals:
 
 - Remote command execution.
 - Credential handling.
 - Persistent agent control channel.
+- Live per-device status streaming (deferred).
 
 Acceptance criteria:
 
-- Probe runs without desktop dependencies.
-- Probe output uses the same event/observation model.
-- POST reporting is optional and documented.
+- Probe runs without desktop dependencies. (done)
+- Probe uses the same event/observation model as the desktop and CLI. (done)
+- MaterialTicket push and heartbeat match the v1 contract and are documented.
+  (done)
+- Standalone stdout JSON output mode is available. (pending)
 
 ## v0.1.5: Server Ingest and Docker Web UI
 

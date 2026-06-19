@@ -88,6 +88,41 @@ netviz-cli diff
 
 ---
 
+## Headless probe
+
+`netviz-probe` is a headless build of the scanner for unattended use on a LAN.
+It runs the same scan engine as the desktop app and CLI, then pushes the devices
+it finds to a **MaterialTicket** backend — so a NetViz instance deployed on a
+customer network can feed live device inventory into tickets.
+
+```sh
+# Scan once, push the results, then exit
+netviz-probe -cidr 192.168.1.0/24 \
+  -url https://rmm.example.com -key <probe-api-key> -once
+
+# Run continuously: re-scan + push on an interval, with heartbeats in between
+netviz-probe -cidr 192.168.1.0/24 -interval 60s \
+  -url https://rmm.example.com -key <probe-api-key>
+```
+
+| Flag | Purpose |
+| --- | --- |
+| `-cidr` | IPv4 CIDR to scan (required) |
+| `-url` | MaterialTicket base URL (or `NETVIZ_MATERIALTICKET_URL`) |
+| `-key` | Probe API key, sent as `X-Probe-Key` (or `NETVIZ_MATERIALTICKET_KEY`) |
+| `-interval` | Heartbeat / re-scan interval (default `1m`) |
+| `-once` | Scan once, push, and exit instead of running continuously |
+
+The URL and key can come from the environment (`NETVIZ_MATERIALTICKET_URL`,
+`NETVIZ_MATERIALTICKET_KEY`), which keeps the key out of process listings and
+shell history. The API key is issued once when an admin registers the probe in
+MaterialTicket. After each scan the probe `POST`s its devices to `/probe/devices`
+(upsert-keyed, so re-scans don't duplicate) and keeps itself marked online via
+periodic `/probe/heartbeat`. A failed push is retried on the next cycle, not
+dropped. The probe has no desktop, Wails, or UI dependencies.
+
+---
+
 ## Build from source
 
 You only need this if you want to develop NetViz or build it yourself — most
@@ -112,7 +147,7 @@ make test          # go test ./...
 make lint          # go vet ./...
 make build-cli     # native CLI scanner
 make build-server  # placeholder server (see roadmap)
-make build-probe   # placeholder headless probe (see roadmap)
+make build-probe   # netviz-probe headless scanner (see "Headless probe" above)
 ```
 
 The SQLite history store uses the pure-Go `modernc.org/sqlite` driver, so no
@@ -136,9 +171,10 @@ JSON, file export, and SQLite history — consumes the same typed event stream.
 Current consumers   Desktop table · grouped graph · hierarchy map
                     CLI JSON output · file save/open · CSV export
                     SQLite history + diff · monitor mode
+                    netviz-probe MaterialTicket reporter
 
-Future consumers    Headless probe reporter · server ingest endpoint
-                    Web UI latest-state view · websocket event streamer
+Future consumers    Server ingest endpoint · web UI latest-state view
+                    websocket event streamer
 ```
 
 ---
@@ -149,7 +185,8 @@ Future consumers    Headless probe reporter · server ingest endpoint
   parity *(current)*
 - **v0.0.2** — visual polish, packaging, signed installers, screenshots
 - **v0.0.3** — history/diff UX and scan management
-- **v0.1.0** — `netviz-probe` headless scanner that emits JSON
+- **v0.1.0** — `netviz-probe` headless scanner with MaterialTicket device push
+  and heartbeat reporting *(in progress)*
 - **v0.1.5** — single-tenant server ingest + Docker image at
   `ghcr.io/spillers-technology/netviz`
 - **v0.1.9** — multi-tenant hosted/server mode with probe enrollment

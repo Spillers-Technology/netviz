@@ -655,7 +655,7 @@ pre {
 
 .pipeline {
   display: grid;
-  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  grid-template-columns: repeat(7, minmax(96px, 1fr));
   gap: 10px;
   margin-top: 24px;
 }
@@ -703,6 +703,10 @@ pre {
 
 .roadmap li.current {
   outline: 2px solid #0f6cbd;
+}
+
+.roadmap li.next {
+  outline: 2px dashed #0f6cbd;
 }
 
 .roadmap b {

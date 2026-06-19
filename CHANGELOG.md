@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.1.0 (in progress)
+
+Adds the first `netviz-probe` headless scanner and its MaterialTicket
+integration. A netviz instance deployed on a customer LAN can now act as a
+probe: it scans the network and pushes the devices it finds to a MaterialTicket
+backend, which upserts them and links them to tickets.
+
+Added:
+
+- `netviz-probe` headless scanner binary built on the shared scanner core, with
+  no desktop/Wails/UI dependencies.
+- `internal/materialticket` package: serializes host observations to the
+  MaterialTicket probe device contract (v1) and provides a transport-only client
+  for the probe ingest endpoints.
+- Device push: `POST /probe/devices` after each completed scan. Records are
+  keyed for upsert (id falls back mac → ip), so re-scanning updates devices
+  rather than duplicating them.
+- Heartbeat: periodic `POST /probe/heartbeat` carrying the probe version and
+  scanned CIDR.
+- Flag and environment configuration: `-cidr`, `-url`, `-key`, `-interval`, and
+  `-once`, with `NETVIZ_MATERIALTICKET_URL` / `NETVIZ_MATERIALTICKET_KEY` env
+  fallbacks that keep the API key out of process listings and shell history.
+- Bounded-backoff retry that holds undelivered records for the next cycle
+  instead of dropping them.
+
+Notes:
+
+- The probe authenticates to MaterialTicket with an API key issued once when an
+  admin registers the probe; it is sent as the `X-Probe-Key` header.
+- The wire contract is owned by MaterialTicket (`NETVIZ_CONTRACT_VERSION = 1`).
+  Keep `internal/materialticket` in lockstep with its normalizer, or bump the
+  contract version on both sides together.
+- Standalone stdout JSON output and live per-device status streaming are not
+  implemented yet.
+
 ## v0.0.1
 
 Initial desktop release target.

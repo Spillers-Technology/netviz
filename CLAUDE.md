@@ -39,6 +39,9 @@ longer accurate. v0.0.1 now includes:
 - Desktop may depend on scanner core.
 - Server must not depend on Wails.
 - Probe must not depend on Wails or desktop code.
+- The MaterialTicket integration lives in `internal/materialticket` and depends
+  only on `internal/model`. The probe may depend on the scanner core and
+  `internal/materialticket`.
 - Scanner events are the primary integration surface.
 - Keep scanner configuration constrained and explicit. Validate CIDR input. Do
   not add arbitrary scanner flags.
@@ -52,8 +55,9 @@ longer accurate. v0.0.1 now includes:
 - v0.0.2: visual polish, packaging, release hardening, screenshots, and UX
   cleanup.
 - v0.0.3: history/diff UX and scan management.
-- v0.1.0: `netviz-probe` headless scanner that emits JSON and can optionally
-  report to a server.
+- v0.1.0: `netviz-probe` headless scanner that pushes device records to a
+  MaterialTicket backend with heartbeat reporting (standalone JSON output still
+  pending). In progress.
 - v0.1.5: server ingest mode and Docker image at `ghcr.io/spillers-technology/netviz`.
 - v0.1.9: hosted/server model with multi-tenancy, probe enrollment, and tokens.
 - v0.2.0: polish, hardening, performance, accessibility, and docs.
