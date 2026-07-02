@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="NetViz is a free, open-source LAN scanner and network visualizer for Windows, macOS, and Linux. Scan a CIDR, watch devices stream in live, and explore them as a table, grouped graph, and hierarchy map — with monitor mode, local history, and diffs."
+      content="NetViz is a free, open-source LAN scanner and network visualizer for Windows, macOS, and Linux. Scan a CIDR, watch devices stream in live, and explore them as a table, grouped graph, and hierarchy map — plus an always-on probe, a self-hosted server with an interactive network map, and OIDC SSO."
     />
     <meta property="og:title" content="NetViz | Free LAN Scanner &amp; Network Visualizer" />
     <meta
       property="og:description"
-      content="Scan. Map. Monitor. Repeat. A modern, open-source LAN scanner with live visualizations, monitor mode, local history, and CLI parity."
+      content="Scan. Map. Monitor. Repeat. A modern, open-source LAN scanner with live visualizations, monitor mode, history, an always-on probe, and a self-hosted server with an interactive network map."
     />
     <title>NetViz | Free LAN Scanner &amp; Network Visualizer</title>
     <link rel="stylesheet" href="styles.css" />
@@ -25,6 +25,7 @@
         <a href="#download">Download</a>
         <a href="#features">Features</a>
         <a href="#views">Views</a>
+        <a href="#fleet">Probe &amp; Server</a>
         <a href="#cli">CLI</a>
         <a href="#architecture">Architecture</a>
         <a href="#roadmap">Roadmap</a>
@@ -147,11 +148,12 @@
             </p>
           </article>
           <article class="feature">
-            <h3>Best-effort enrichment</h3>
+            <h3>Real vendor identification</h3>
             <p>
-              Hostname resolution plus MAC address and vendor lookup from your
-              local ARP cache, with a conservative device-type guess for every
-              host.
+              Hostname resolution, MAC lookup from your ARP cache, and vendor
+              names from an embedded snapshot of the full IEEE OUI registry —
+              about 40,000 manufacturers — with a conservative device-type
+              guess for every host.
             </p>
           </article>
           <article class="feature">
@@ -169,10 +171,11 @@
             </p>
           </article>
           <article class="feature">
-            <h3>Device details on click</h3>
+            <h3>Device details &amp; history on click</h3>
             <p>
-              Click any device in the graph or hierarchy for a detail panel
-              with IP, hostname, MAC, vendor, device type, and open ports.
+              Click any device for a detail panel with IP, hostname, MAC,
+              vendor, type, open ports — and its stored timeline: when it was
+              up, what ports it exposed, and when that changed.
             </p>
           </article>
           <article class="feature">
@@ -185,9 +188,17 @@
           <article class="feature">
             <h3>Local history &amp; diff</h3>
             <p>
-              Completed scans land in a local SQLite database. The History tab
-              compares the two latest runs and shows exactly which devices are
-              new or missing.
+              Completed scans land in a local SQLite database — monitor cycles
+              with no changes are merged, so history records state changes,
+              not noise. The History tab diffs the latest runs.
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Built-in updates</h3>
+            <p>
+              The app checks GitHub Releases, downloads on your say-so,
+              verifies the SHA-256 checksum, and installs in place — keeping
+              the previous version as a backup.
             </p>
           </article>
         </div>
@@ -300,6 +311,55 @@
         </div>
       </section>
 
+      <section id="fleet" class="band features">
+        <h2>From one desktop to a small fleet</h2>
+        <p class="lede">
+          The same scan engine ships three ways: the desktop app, an always-on
+          probe you drop at a site, and a self-hosted server that turns probe
+          pushes into a live web dashboard.
+        </p>
+        <div class="featureGrid">
+          <article class="feature">
+            <h3>Always-on probe</h3>
+            <p>
+              <code>netviz-probe</code> installs as a Windows service, systemd
+              unit, or launchd job, scans on an interval, and pushes device
+              inventory with heartbeats — to AnchorDesk or your own NetViz
+              server, same wire contract.
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Provision from the GUI</h3>
+            <p>
+              The desktop Probe tab installs, configures, and manages the
+              service — URL, key, CIDR, interval — through a shared config
+              file the running service re-reads on every cycle.
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Self-hosted server</h3>
+            <p>
+              One Docker container stores every push in SQLite and serves a
+              live dashboard: stat tiles, a full device table, and an
+              interactive canvas network map with zoom, pan, tooltips, and a
+              clickable legend. Try the map with <code>/?demo</code>.
+            </p>
+          </article>
+          <article class="feature">
+            <h3>Sign in with your IdP</h3>
+            <p>
+              Optional OIDC SSO (Entra ID, Google, Keycloak, Authentik) puts
+              the web UI behind your identity provider. Probes authenticate
+              with keys; ingest is deny-by-default until one is configured.
+            </p>
+          </article>
+        </div>
+        <pre><code>docker run -p 8080:8080 -e NETVIZ_INGEST_KEY=your-key \
+  -v netviz-data:/data ghcr.io/spillers-technology/netviz
+
+netviz-probe -url http://server:8080 -key your-key -cidr 192.168.1.0/24</code></pre>
+      </section>
+
       <section id="cli" class="band split">
         <div>
           <h2>Prefer the command line?</h2>
@@ -330,6 +390,7 @@ netviz-cli diff</code></pre>
           <span>SQLite history</span>
           <span>Monitor mode</span>
           <span>netviz-probe</span>
+          <span>netviz-server + web map</span>
         </div>
       </section>
 
@@ -361,11 +422,12 @@ netviz-cli diff</code></pre>
         <h2>Roadmap</h2>
         <ol>
           <li><b>v0.0.1</b><span>Desktop scanner with table, graph, hierarchy, monitor mode, exports, history, and CLI parity.</span></li>
-          <li><b>v0.0.2</b><span>Visual polish, signed installers, screenshots, and release hardening.</span></li>
-          <li><b>v0.0.3</b><span>History/diff UX and scan management.</span></li>
-          <li class="current"><b>v0.1.0 — now</b><span><code>netviz-probe</code> headless scanner with AnchorDesk device push, heartbeat reporting, and native service management.</span></li>
-          <li><b>v0.1.5</b><span>Server ingest mode and a Docker image on GHCR.</span></li>
-          <li><b>v0.2.0</b><span>Performance, accessibility, hardening, and docs.</span></li>
+          <li><b>v0.1.0</b><span><code>netviz-probe</code> headless scanner with AnchorDesk device push, heartbeats, and native service management.</span></li>
+          <li><b>v0.2.0</b><span>Desktop probe management GUI, release updater, and a colorblind-validated visual pass.</span></li>
+          <li><b>v0.3.0</b><span>Self-hosted server: probe ingest, Docker image on GHCR, and the interactive web network map.</span></li>
+          <li><b>v0.4.0</b><span>IEEE OUI vendor database, per-device history, in-place updates, emoji device icons.</span></li>
+          <li class="current"><b>v0.9.0 — now</b><span>OIDC SSO for the server, security posture, and the stability freeze — the 1.0 release candidate.</span></li>
+          <li><b>v1.0.0</b><span>Signed and notarized builds on the frozen v0.9 feature set.</span></li>
         </ol>
       </section>
     </main>

@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.9.1 — 2026-07-02
+
+Added:
+
+- Self-contained update finalizer: Install and Restart now launches the
+  staged new binary in `-apply-update` mode, which waits for the old
+  process to release the executable, swaps it in with a `.old` backup, and
+  relaunches — pure Go on every platform, no cmd/tasklist helper scripts.
+  Leftover `.old`/`.new` files are cleaned up on the next normal start.
+- GitHub Pages site refreshed for the v0.9 era: probe and server section
+  (Docker, web network map, `?demo`, OIDC SSO), IEEE OUI vendor
+  identification, per-device history, built-in updates, and the current
+  roadmap through v1.0.0.
+
 ## v0.9.0 — 2026-07-02
 
 Server SSO and the stability freeze. This is the release candidate feature
