@@ -32,7 +32,7 @@ func (r *ARPResolver) Lookup(ctx context.Context, ip string) (ARPEntry, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if time.Since(r.refreshed) > 350*time.Millisecond {
+	if time.Since(r.refreshed) > time.Second {
 		r.entries = readARPTable(ctx)
 		r.refreshed = time.Now()
 	}
@@ -47,6 +47,7 @@ func readARPTable(ctx context.Context) map[string]ARPEntry {
 	} else {
 		cmd = exec.CommandContext(ctx, "arp", "-an")
 	}
+	hideConsoleWindow(cmd)
 
 	out, err := cmd.Output()
 	if err != nil {

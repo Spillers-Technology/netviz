@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.2 — 2026-07-02
+
+Fixed:
+
+- The black console window that flashed at every scan start (and kept
+  flashing during scans) on Windows. The scanner's ARP-cache reads and the
+  desktop's probe/updater child processes now run with CREATE_NO_WINDOW, so
+  GUI users never see console flashes from subprocesses.
+- ARP cache refresh eased from 350ms to 1s, cutting subprocess churn during
+  scans without hurting enrichment freshness.
+
 ## v0.9.1 — 2026-07-02
 
 Added:
