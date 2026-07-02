@@ -21,3 +21,6 @@ desktop/frontend/package.json.md5
 # Local env
 .env
 .env.*
+
+# Stray module-level build output
+desktop/desktop.exe
