@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -22,12 +21,11 @@ import (
 const maxUpdateBinarySize = 512 << 20
 
 // ApplyDownloadedUpdate extracts the desktop binary from a downloaded (and
-// already checksum-verified) release archive and swaps it in for the running
-// executable. On Windows the swap happens via a helper script after the app
-// exits — the running exe cannot be replaced in place — so a successful call
-// quits the app. On Linux the rename happens immediately and the user
-// restarts when convenient. macOS app bundles are staged for manual
-// replacement.
+// already checksum-verified) release archive, stages it next to the running
+// executable, and hands off to the staged binary's own -apply-update mode to
+// perform the swap and relaunch once this process exits (see
+// update_finalize.go). Fully self-contained: no shell or helper scripts.
+// macOS app bundles are staged for manual replacement.
 func (a *App) ApplyDownloadedUpdate(archivePath string) (string, error) {
 	archivePath = strings.TrimSpace(archivePath)
 	if archivePath == "" {
@@ -55,33 +53,21 @@ func (a *App) ApplyDownloadedUpdate(archivePath string) (string, error) {
 		return "", err
 	}
 
-	switch runtime.GOOS {
-	case "windows":
-		if err := launchWindowsSwapHelper(executable, staged); err != nil {
-			_ = os.Remove(staged)
-			return "", err
-		}
-		message := "Update staged. NetViz will close and restart on the new version."
-		if a.ctx != nil {
-			wailsruntime.Quit(a.ctx)
-		}
-		return message, nil
-	default:
-		backup := executable + ".old"
-		_ = os.Remove(backup)
-		if err := os.Rename(executable, backup); err != nil {
-			_ = os.Remove(staged)
-			return "", fmt.Errorf("back up current binary: %w", err)
-		}
-		if err := os.Rename(staged, executable); err != nil {
-			_ = os.Rename(backup, executable)
-			return "", fmt.Errorf("install new binary: %w", err)
-		}
-		if err := os.Chmod(executable, 0o755); err != nil {
-			return "", err
-		}
-		return "Update installed. Restart NetViz to run the new version.", nil
+	// The staged binary finalizes its own installation: it waits for this
+	// process to release the executable, swaps it in with a .old backup, and
+	// relaunches. No shell, no helper scripts — the updater is the update.
+	cmd := exec.Command(staged, applyUpdateFlag, "-target", executable)
+	cmd.Dir = filepath.Dir(executable)
+	if err := cmd.Start(); err != nil {
+		_ = os.Remove(staged)
+		return "", fmt.Errorf("start update finalizer: %w", err)
 	}
+
+	message := "Update staged. NetViz will close and restart on the new version."
+	if a.ctx != nil {
+		wailsruntime.Quit(a.ctx)
+	}
+	return message, nil
 }
 
 // extractDesktopBinary finds the desktop executable inside a release archive
@@ -186,38 +172,4 @@ func (c *closerChain) Close() error {
 		}
 	}
 	return first
-}
-
-// launchWindowsSwapHelper writes and starts a detached cmd script that waits
-// for this process to exit, swaps the staged binary in (keeping a .old
-// backup), and relaunches NetViz.
-func launchWindowsSwapHelper(executable string, staged string) error {
-	script := fmt.Sprintf(`@echo off
-:wait
-tasklist /FI "PID eq %d" 2>nul | find "%d" >nul
-if not errorlevel 1 (
-  ping -n 2 127.0.0.1 >nul
-  goto wait
-)
-move /y "%s" "%s.old" >nul
-move /y "%s" "%s" >nul
-start "" "%s"
-del "%%~f0"
-`, os.Getpid(), os.Getpid(), executable, executable, staged, executable, executable)
-
-	dir, err := updateDownloadDir()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
-	scriptPath := filepath.Join(dir, "apply-update-"+strconv.Itoa(os.Getpid())+".cmd")
-	if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
-		return err
-	}
-
-	cmd := exec.Command("cmd", "/c", scriptPath)
-	cmd.Dir = filepath.Dir(executable)
-	return cmd.Start()
 }
