@@ -58,6 +58,7 @@ func (a *App) ApplyDownloadedUpdate(archivePath string) (string, error) {
 	// relaunches. No shell, no helper scripts — the updater is the update.
 	cmd := exec.Command(staged, applyUpdateFlag, "-target", executable)
 	cmd.Dir = filepath.Dir(executable)
+	hideConsoleWindow(cmd)
 	if err := cmd.Start(); err != nil {
 		_ = os.Remove(staged)
 		return "", fmt.Errorf("start update finalizer: %w", err)

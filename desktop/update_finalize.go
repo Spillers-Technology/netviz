@@ -48,6 +48,7 @@ func maybeRunUpdateFinalizer() bool {
 	if *relaunch {
 		cmd := exec.Command(*target)
 		cmd.Dir = fileDir(*target)
+		hideConsoleWindow(cmd)
 		_ = cmd.Start()
 	}
 	return true

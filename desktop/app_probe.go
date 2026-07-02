@@ -274,6 +274,7 @@ func runProbeCommand(ctx context.Context, path string, extraEnv []string, args .
 	defer cancel()
 	cmd := exec.CommandContext(cmdCtx, path, args...)
 	cmd.Env = append(os.Environ(), extraEnv...)
+	hideConsoleWindow(cmd)
 	output, err := cmd.CombinedOutput()
 	return strings.TrimSpace(redactProbeOutput(string(output), extraEnv)), err
 }
