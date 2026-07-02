@@ -61,6 +61,39 @@ for that exact archive.
 The workflow also supports manual dispatch with a `tag` input to rebuild assets
 for an existing release.
 
+## Release Checklist (every release)
+
+Code health:
+
+- `go test ./...` and `go vet ./...` at the repo root
+- `cd desktop && go test ./...` (the desktop app is its own module)
+- `npm run --prefix desktop/frontend build`
+- `npm run --prefix web build` and commit any `internal/server/webdist` changes
+
+Version and docs:
+
+- Bump `internal/version/version.go` to the release version
+- [CHANGELOG.md](CHANGELOG.md) entry with the release date
+- [MILESTONES.md](MILESTONES.md) status reflects what actually shipped
+- README roadmap and feature text match the release
+
+Functional spot checks:
+
+- Desktop: scan a real /24; table, graph, and hierarchy stay responsive
+- Server: `?demo` map renders; probe push creates then updates without
+  duplicates; bad key gets 401; no key gets 503
+- Probe: `-once` push against a live AnchorDesk or netviz-server
+- Updater: Update tab detects the previous release, downloads, verifies the
+  checksum, and Install and Restart swaps the binary (keep the `.old` backup)
+
+Publishing:
+
+- Tag `vX.Y.Z` on main; publish the GitHub Release (tag push publishes the
+  Docker image; the release event builds platform archives)
+- Confirm self-hosted runners are online — queued jobs mean a runner is down
+- Confirm each platform archive and its `.sha256` attach to the release
+- Release notes mention authorized-use-only scanning
+
 ## v0.1.0 Checklist
 
 - `go test ./...`

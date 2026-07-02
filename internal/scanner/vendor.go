@@ -1,6 +1,10 @@
 package scanner
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/Spillers-Technology/netviz/internal/oui"
+)
 
 var vendorPrefixes = map[string]string{
 	"00:1a:11": "Google",
@@ -76,6 +80,9 @@ var vendorPrefixes = map[string]string{
 	"f4:92:bf": "Ubiquiti",
 }
 
+// VendorForMAC resolves a MAC to a vendor name. The curated map wins because
+// its names are short and display-friendly; everything else falls back to the
+// embedded IEEE OUI registry.
 func VendorForMAC(mac string) string {
 	mac = NormalizeMAC(mac)
 	if len(mac) < 8 {
@@ -84,5 +91,5 @@ func VendorForMAC(mac string) string {
 	if vendor, ok := vendorPrefixes[strings.ToLower(mac[:8])]; ok {
 		return vendor
 	}
-	return ""
+	return oui.Lookup(mac)
 }

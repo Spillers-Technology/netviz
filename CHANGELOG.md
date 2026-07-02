@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.4.0 — 2026-07-02
+
+Polish and hardening: real vendor coverage, useful per-device history, a
+finished updater, and friendlier visuals.
+
+Added:
+
+- Vendor enrichment now falls back to an embedded snapshot of the full IEEE
+  OUI registry (~40k prefixes, `internal/oui`) when the curated short-name
+  table misses. Classifier learned more vendors (MikroTik, Juniper, Aruba,
+  Fortinet, HP Inc, Lexmark, Kyocera).
+- Per-device history in the desktop detail panel: the last 25 stored
+  observations of the selected device (status, ports, time range) straight
+  from local SQLite history.
+- Monitor-mode history coalescing: a scan whose host state is identical to
+  the previous run extends that run instead of inserting a new one, so
+  monitor mode records state changes rather than thousands of identical
+  runs per day. Local history is also pruned to the newest 200 runs.
+- Updater in-place install: Install and Restart extracts the desktop binary
+  from the verified archive and swaps it in (on Windows via a helper that
+  waits for exit, swaps, and relaunches; on Linux an immediate rename). The
+  previous binary is kept alongside as a `.old` backup.
+- Emoji device icons in the desktop hierarchy circles, legends, group
+  headers, and the detail panel (🌐 💻 🐧 🍎 🖨️ 🎥 🖥️), with letter initials
+  kept for unknown devices.
+- A living release checklist in RELEASING.md.
+
+Notes:
+
+- Windows code signing and macOS notarization remain open and are tracked as
+  a 1.0.0 gate — they need certificates, not code.
+- The OUI snapshot adds ~380KB to binaries; regenerate it from the IEEE
+  registry when refreshing.
+
 ## v0.3.0 — 2026-07-02
 
 Adds single-tenant server ingest and a real web UI. A `netviz-probe` can now

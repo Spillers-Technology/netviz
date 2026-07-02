@@ -99,6 +99,13 @@ type ScanEvent = {
   total_hosts?: number;
 };
 
+type HostHistoryEntry = {
+  run_id: string;
+  started_at: string;
+  ended_at: string;
+  host: HostObservation;
+};
+
 type Tab = "table" | "graph" | "hierarchy" | "history" | "probe" | "update";
 type DeviceState = "new" | "online" | "offline" | "changed" | "stable";
 
@@ -115,6 +122,7 @@ declare global {
           SaveCSVFile(): Promise<void>;
           ListHistory(): Promise<ScanRun[]>;
           LatestDiff(): Promise<ScanDiff>;
+          HostHistory(ip: string): Promise<HostHistoryEntry[]>;
           ChooseProbeBinary(): Promise<string>;
           GetProbeStatus(probePath: string): Promise<ProbeServiceStatus>;
           ProvisionProbe(request: ProbeSetupRequest): Promise<ProbeServiceStatus>;
@@ -122,6 +130,7 @@ declare global {
           CheckForUpdate(): Promise<UpdateInfo>;
           DownloadLatestUpdate(): Promise<UpdateInfo>;
           OpenUpdateDownload(path: string): Promise<void>;
+          ApplyDownloadedUpdate(path: string): Promise<string>;
         };
       };
     };
@@ -496,6 +505,21 @@ function App() {
     }
   }
 
+  async function applyUpdate() {
+    const app = window.go?.main?.App;
+    if (!app || !updateInfo.download_path) return;
+    setError("");
+    setUpdateBusy(true);
+    try {
+      const message = await app.ApplyDownloadedUpdate(updateInfo.download_path);
+      setUpdateInfo((info) => ({ ...info, message }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUpdateBusy(false);
+    }
+  }
+
   return (
     <main className="shell">
       <section className="toolbar" aria-label="Scan controls">
@@ -595,6 +619,7 @@ function App() {
           onCheck={() => checkForUpdates(true)}
           onDownload={downloadUpdate}
           onOpenDownload={openUpdateDownload}
+          onApply={applyUpdate}
         />
       )}
     </main>
@@ -607,12 +632,14 @@ function UpdateView({
   onCheck,
   onDownload,
   onOpenDownload,
+  onApply,
 }: {
   info: UpdateInfo;
   busy: boolean;
   onCheck: () => void;
   onDownload: () => void;
   onOpenDownload: () => void;
+  onApply: () => void;
 }) {
   return (
     <section className="updateWrap" aria-label="Application update">
@@ -663,11 +690,18 @@ function UpdateView({
             <button className="primary" onClick={onDownload} disabled={busy || !info.available}>
               Download Update
             </button>
+            <button className="primary" onClick={onApply} disabled={busy || !info.download_path}>
+              Install and Restart
+            </button>
             <button onClick={onOpenDownload} disabled={busy || !info.download_path}>
               Open Download
             </button>
           </div>
-          <p className="quiet">Updates are downloaded only after confirmation and verified with the release checksum when GitHub provides one.</p>
+          <p className="quiet">
+            Updates are downloaded only after confirmation and verified with the release checksum when
+            GitHub provides one. Install and Restart swaps the desktop binary and keeps the previous
+            version next to it as a .old backup.
+          </p>
         </section>
       </div>
     </section>
@@ -894,7 +928,7 @@ function GraphView({ hosts, states }: { hosts: HostObservation[]; states: Record
               <div className="groupHeader">
                 <span className="legendItem">
                   <i className={`legendSwatch ${categoryClass(group.name)}`} aria-hidden="true" />
-                  {group.name}
+                  {CATEGORY_EMOJI[group.name] ? `${CATEGORY_EMOJI[group.name]} ${group.name}` : group.name}
                 </span>
                 <strong>{group.hosts.length}</strong>
               </div>
@@ -954,7 +988,7 @@ function HierarchyView({ hosts, states }: { hosts: HostObservation[]; states: Re
             {CATEGORY_NAMES.map((name) => (
               <span className="legendItem" key={name}>
                 <i className={`legendSwatch ${categoryClass(name)}`} aria-hidden="true" />
-                {name}
+                {CATEGORY_EMOJI[name] ? `${CATEGORY_EMOJI[name]} ${name}` : name}
               </span>
             ))}
           </div>
@@ -979,7 +1013,9 @@ function HierarchyView({ hosts, states }: { hosts: HostObservation[]; states: Re
               title={`${item.host.ip} ${formatPorts(item.host.open_ports)}`}
               onClick={() => setSelectedIP(item.host.ip)}
             >
-              <span>{nodeInitial(item.host)}</span>
+              <span style={CATEGORY_EMOJI[categoryFor(item.host)] ? { fontSize: Math.max(10, item.size * 0.52) } : undefined}>
+                {CATEGORY_EMOJI[categoryFor(item.host)] || nodeInitial(item.host)}
+              </span>
               {item.host.open_ports.length > 0 && <b>{item.host.open_ports.length}</b>}
             </button>
           ))}
@@ -1052,6 +1088,23 @@ function HistoryView({ history, diff, onRefresh }: { history: ScanRun[]; diff: S
 }
 
 function DeviceDetail({ host, state = "stable" }: { host?: HostObservation; state?: DeviceState }) {
+  const [history, setHistory] = useState<HostHistoryEntry[]>([]);
+  const ip = host?.ip || "";
+
+  useEffect(() => {
+    let cancelled = false;
+    setHistory([]);
+    if (!ip) return;
+    window.go?.main?.App?.HostHistory(ip)
+      .then((entries) => {
+        if (!cancelled) setHistory(entries || []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [ip]);
+
   return (
     <aside className="detailPanel" aria-label="Selected device details">
       {host ? (
@@ -1059,7 +1112,10 @@ function DeviceDetail({ host, state = "stable" }: { host?: HostObservation; stat
           <div className="detailHeader">
             <h2>{host.hostname || host.ip}</h2>
             <div className="detailBadges">
-              <span>{host.device_type}</span>
+              <span>
+                {CATEGORY_EMOJI[categoryFor(host)] ? `${CATEGORY_EMOJI[categoryFor(host)]} ` : ""}
+                {host.device_type}
+              </span>
               <StatePill state={state} />
             </div>
           </div>
@@ -1096,12 +1152,48 @@ function DeviceDetail({ host, state = "stable" }: { host?: HostObservation; stat
               <p>No default scan ports responded.</p>
             )}
           </section>
+          <section className="miniHistory">
+            <h3>History</h3>
+            {history.length > 0 ? (
+              <div className="miniHistoryList">
+                {history.map((entry) => (
+                  <div className="miniHistoryRow" key={entry.run_id}>
+                    <span className="miniHistoryTime">{formatHistoryRange(entry)}</span>
+                    <span>{summarizeObservation(entry.host)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="quiet">No stored history for this device yet.</p>
+            )}
+            {history.length > 0 && (
+              <p className="quiet">Idle monitor cycles are merged; each row is an observed state.</p>
+            )}
+          </section>
         </>
       ) : (
         <p className="quiet">Run a scan to select a device.</p>
       )}
     </aside>
   );
+}
+
+function formatHistoryRange(entry: HostHistoryEntry) {
+  const start = new Date(entry.started_at);
+  const end = entry.ended_at ? new Date(entry.ended_at) : null;
+  const day = start.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
+  const startTime = start.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  if (!end || end.getTime() - start.getTime() < 90_000) {
+    return `${day} ${startTime}`;
+  }
+  const endTime = end.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${day} ${startTime}–${endTime}`;
+}
+
+function summarizeObservation(host: HostObservation) {
+  if (!host.alive && host.open_ports.length === 0) return "down";
+  const ports = host.open_ports.map((port) => port.port).join(", ");
+  return ports ? `up · ${ports}` : "up";
 }
 
 function DiffList({ title, hosts }: { title: string; hosts: HostObservation[] }) {
@@ -1125,6 +1217,17 @@ function StatePill({ state }: { state: DeviceState }) {
 }
 
 const CATEGORY_NAMES = ["firewall/network", "windows/smb", "linux/iot", "apple", "printer", "camera/media", "web appliance", "unknown"];
+
+const CATEGORY_EMOJI: Record<string, string> = {
+  "firewall/network": "🌐",
+  "windows/smb": "💻",
+  "linux/iot": "🐧",
+  apple: "🍎",
+  printer: "🖨️",
+  "camera/media": "🎥",
+  "web appliance": "🖥️",
+  unknown: "",
+};
 
 function categoryClass(name: string) {
   return name.replaceAll("/", "-").replaceAll(" ", "-");

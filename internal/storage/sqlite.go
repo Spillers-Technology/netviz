@@ -152,6 +152,122 @@ func (s *SQLiteStore) HostsForRun(ctx context.Context, runID string) ([]model.Ho
 	return hosts, rows.Err()
 }
 
+// SaveScanRunCoalesced stores the run unless its host set is equivalent to
+// the latest stored run (same hosts, aliveness, ports, names — timestamps
+// ignored), in which case it extends that run's ended_at instead. This keeps
+// monitor mode from writing thousands of identical runs a day while
+// preserving every run where something actually changed. Returns true when
+// the run was coalesced into the previous one.
+func (s *SQLiteStore) SaveScanRunCoalesced(ctx context.Context, run model.ScanRun, hosts []model.HostObservation) (bool, error) {
+	latest, err := s.ListScanRuns(ctx, 1)
+	if err != nil {
+		return false, err
+	}
+	if len(latest) == 1 && latest[0].CIDR == run.CIDR {
+		previous, err := s.HostsForRun(ctx, latest[0].ID)
+		if err != nil {
+			return false, err
+		}
+		if hostsEquivalent(previous, hosts) {
+			endedAt := run.EndedAt
+			if endedAt.IsZero() {
+				endedAt = time.Now().UTC()
+			}
+			return true, s.TouchScanRun(ctx, latest[0].ID, endedAt)
+		}
+	}
+	return false, s.SaveScanRun(ctx, run, hosts)
+}
+
+// TouchScanRun extends a stored run's ended_at, marking its state as still
+// current without writing a new run.
+func (s *SQLiteStore) TouchScanRun(ctx context.Context, runID string, endedAt time.Time) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE scan_runs SET ended_at = ? WHERE id = ?`, formatTime(endedAt), runID)
+	return err
+}
+
+// HostHistoryEntry is one observation of a host in a stored run.
+type HostHistoryEntry struct {
+	RunID     string                `json:"run_id"`
+	StartedAt time.Time             `json:"started_at"`
+	EndedAt   time.Time             `json:"ended_at"`
+	Host      model.HostObservation `json:"host"`
+}
+
+// HostHistory returns the newest-first observations of a single IP across
+// stored runs. With coalescing enabled each entry approximates a state
+// change rather than a raw scan tick.
+func (s *SQLiteStore) HostHistory(ctx context.Context, ip string, limit int) ([]HostHistoryEntry, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT r.id, r.started_at, r.ended_at,
+			h.ip, h.hostname, h.mac_address, h.vendor, h.alive, h.device_type, h.first_seen, h.last_updated, h.open_ports_json
+		FROM host_observations h
+		JOIN scan_runs r ON r.id = h.run_id
+		WHERE h.ip = ?
+		ORDER BY r.started_at DESC
+		LIMIT ?
+	`, ip, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []HostHistoryEntry
+	for rows.Next() {
+		var entry HostHistoryEntry
+		var startedAt, endedAt, firstSeen, lastUpdated, portsJSON string
+		var alive bool
+		err := rows.Scan(&entry.RunID, &startedAt, &endedAt,
+			&entry.Host.IP, &entry.Host.Hostname, &entry.Host.MACAddress, &entry.Host.Vendor, &alive, &entry.Host.DeviceType, &firstSeen, &lastUpdated, &portsJSON)
+		if err != nil {
+			return nil, err
+		}
+		entry.Host.Alive = alive
+		if entry.StartedAt, err = parseTime(startedAt); err != nil {
+			return nil, err
+		}
+		if entry.EndedAt, err = parseTime(endedAt); err != nil {
+			return nil, err
+		}
+		if entry.Host.FirstSeen, err = parseTime(firstSeen); err != nil {
+			return nil, err
+		}
+		if entry.Host.LastUpdate, err = parseTime(lastUpdated); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(portsJSON), &entry.Host.OpenPorts); err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	return entries, rows.Err()
+}
+
+// hostsEquivalent compares two host sets on identity fields, aliveness, and
+// ports. Timestamps are deliberately ignored — they differ on every scan.
+func hostsEquivalent(a []model.HostObservation, b []model.HostObservation) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	byIP := hostsByIP(a)
+	for _, host := range b {
+		previous, ok := byIP[host.IP]
+		if !ok ||
+			previous.Hostname != host.Hostname ||
+			previous.MACAddress != host.MACAddress ||
+			previous.Vendor != host.Vendor ||
+			previous.DeviceType != host.DeviceType ||
+			previous.Alive != host.Alive ||
+			!samePorts(previous.OpenPorts, host.OpenPorts) {
+			return false
+		}
+	}
+	return true
+}
+
 // PruneScanRuns deletes all but the newest keep runs and their host
 // observations, returning how many runs were removed. Observations are
 // deleted explicitly rather than via the FK cascade so pruning does not
