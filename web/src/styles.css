@@ -70,6 +70,16 @@ h2 {
   gap: 10px;
 }
 
+.identity {
+  color: var(--text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.identity a {
+  color: var(--blue);
+}
+
 button {
   height: 34px;
   padding: 0 12px;

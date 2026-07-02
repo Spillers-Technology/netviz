@@ -20,11 +20,13 @@ const maxRunsKept = 500
 
 // Config wires a Server. Store is required for ingest and state endpoints.
 // IngestKey guards the probe endpoints; when empty, ingest is disabled and
-// probes receive 503 until the operator configures a key.
+// probes receive 503 until the operator configures a key. OIDC (optional)
+// puts the web UI and read APIs behind SSO sign-in.
 type Config struct {
 	Store     *storage.SQLiteStore
 	IngestKey string
 	Version   string
+	OIDC      OIDCConfig
 }
 
 // ProbeStatus is the last heartbeat the server has seen, held in memory.
@@ -40,6 +42,7 @@ type Server struct {
 	store     *storage.SQLiteStore
 	ingestKey string
 	version   string
+	auth      *authenticator
 
 	mu    sync.Mutex
 	probe *ProbeStatus
@@ -51,13 +54,19 @@ func New(cfg Config) *Server {
 		store:     cfg.Store,
 		ingestKey: cfg.IngestKey,
 		version:   cfg.Version,
+		auth:      newAuthenticator(cfg.OIDC),
 	}
 	s.routes()
 	return s
 }
 
+// AuthEnabled reports whether web sign-in is configured.
+func (s *Server) AuthEnabled() bool {
+	return s.auth.enabled()
+}
+
 func (s *Server) Handler() http.Handler {
-	return s.mux
+	return s.withAuth(s.mux)
 }
 
 func (s *Server) ListenAndServe(addr string) error {

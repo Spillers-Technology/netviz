@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.9.0 — 2026-07-02
+
+Server SSO and the stability freeze. This is the release candidate feature
+set for 1.0.0 — what remains for the major version is code signing,
+notarization, and final validation, not features.
+
+Added:
+
+- OIDC sign-in for the server web UI and read APIs: standard Authorization
+  Code + PKCE against any OIDC identity provider (Entra ID, Google,
+  Keycloak, Authentik). Configure with `-oidc-issuer`, `-oidc-client-id`,
+  `-public-url`, and `NETVIZ_OIDC_CLIENT_SECRET`; register
+  `<public-url>/auth/callback` with the IdP.
+- HMAC-signed session cookies (HttpOnly, SameSite=Lax, Secure over https,
+  12h expiry). Set `NETVIZ_SESSION_SECRET` to keep sessions across
+  restarts. `/auth/logout` signs out; `/api/me` reports identity and the
+  web UI shows the signed-in user.
+- Deny-by-default routing when OIDC is configured: unauthenticated API
+  calls get 401, page loads redirect to sign-in; only `/healthz`, the
+  key-authed probe endpoints, and the auth flow itself stay open. Without
+  an issuer the server runs in trusted-LAN mode and logs that loudly.
+- Full sign-in round-trip test against an in-process OIDC issuer with
+  RSA-signed id_tokens: discovery, PKCE, state validation, token exchange,
+  JWKS verification, session issuance, and bad-state rejection.
+- SECURITY.md: security posture, component threat models (probe, server,
+  desktop), key rotation guidance, and the frozen v1 wire contract.
+- README compatibility and semver policy: what v1.0.0 guarantees (wire
+  contract, CLI flags, file formats, history schema migration) and what it
+  does not (internal Go packages).
+- Compose file passes through the OIDC environment.
+
+Notes:
+
+- SAML2 is deferred until a real deployment needs it; the auth layer is
+  provider-agnostic OIDC.
+- Sessions use a per-boot secret when `NETVIZ_SESSION_SECRET` is unset,
+  which signs everyone out on server restart.
+
 ## v0.4.0 — 2026-07-02
 
 Polish and hardening: real vendor coverage, useful per-device history, a
@@ -72,7 +110,7 @@ Added:
 Notes:
 
 - The web UI has no sign-in yet; run the server on a trusted network. SSO
-  (OIDC first-class) lands in v0.5.0 and is required before 1.0.0.
+  (OIDC first-class) lands in v0.9.0 and is required before 1.0.0.
 - Multi-tenancy is out of scope permanently — AnchorDesk owns tenancy.
 
 ## v0.2.0 — 2026-07-02
