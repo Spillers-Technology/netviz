@@ -516,7 +516,7 @@ function App() {
         <button className="primary" onClick={() => startScan(false)} disabled={scanning}>
           Start Scan
         </button>
-        <button onClick={toggleMonitor}>
+        <button onClick={toggleMonitor} aria-pressed={monitoring}>
           {monitoring ? "Stop Monitor" : "Monitor"}
         </button>
         <button onClick={cancelScan} disabled={!scanning}>
@@ -547,24 +547,16 @@ function App() {
       )}
 
       <nav className="tabs" aria-label="Views">
-        <button className={tab === "table" ? "active" : ""} onClick={() => setTab("table")}>
-          Table
-        </button>
-        <button className={tab === "graph" ? "active" : ""} onClick={() => setTab("graph")}>
-          Graph
-        </button>
-        <button className={tab === "hierarchy" ? "active" : ""} onClick={() => setTab("hierarchy")}>
-          Hierarchy
-        </button>
-        <button className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}>
-          History
-        </button>
-        <button className={tab === "probe" ? "active" : ""} onClick={() => setTab("probe")}>
-          Probe
-        </button>
-        <button className={tab === "update" ? "active" : ""} onClick={() => setTab("update")}>
-          Update
-        </button>
+        {(["table", "graph", "hierarchy", "history", "probe", "update"] as Tab[]).map((view) => (
+          <button
+            key={view}
+            className={tab === view ? "active" : ""}
+            aria-current={tab === view}
+            onClick={() => setTab(view)}
+          >
+            {view[0].toUpperCase() + view.slice(1)}
+          </button>
+        ))}
       </nav>
 
       {error && <div className="error">{error}</div>}
@@ -900,7 +892,10 @@ function GraphView({ hosts, states }: { hosts: HostObservation[]; states: Record
           {groups.map((group) => (
             <section className="graphGroup" key={group.name}>
               <div className="groupHeader">
-                <span>{group.name}</span>
+                <span className="legendItem">
+                  <i className={`legendSwatch ${categoryClass(group.name)}`} aria-hidden="true" />
+                  {group.name}
+                </span>
                 <strong>{group.hosts.length}</strong>
               </div>
               <div className="nodeGrid">
@@ -954,6 +949,14 @@ function HierarchyView({ hosts, states }: { hosts: HostObservation[]; states: Re
           <div>
             <strong>Firewall hierarchy</strong>
             <span>{hosts.length} shown</span>
+          </div>
+          <div className="legend" aria-label="Device type colors">
+            {CATEGORY_NAMES.map((name) => (
+              <span className="legendItem" key={name}>
+                <i className={`legendSwatch ${categoryClass(name)}`} aria-hidden="true" />
+                {name}
+              </span>
+            ))}
           </div>
         </div>
 
@@ -1121,9 +1124,14 @@ function StatePill({ state }: { state: DeviceState }) {
   return <span className={`statePill ${state}`}>{state}</span>;
 }
 
+const CATEGORY_NAMES = ["firewall/network", "windows/smb", "linux/iot", "apple", "printer", "camera/media", "web appliance", "unknown"];
+
+function categoryClass(name: string) {
+  return name.replaceAll("/", "-").replaceAll(" ", "-");
+}
+
 function groupHosts(hosts: HostObservation[]) {
-  const names = ["firewall/network", "windows/smb", "linux/iot", "apple", "printer", "camera/media", "web appliance", "unknown"];
-  const groups = names.map((name) => ({ name, hosts: [] as HostObservation[] }));
+  const groups = CATEGORY_NAMES.map((name) => ({ name, hosts: [] as HostObservation[] }));
   for (const host of hosts) {
     groups.find((group) => group.name === categoryFor(host))!.hosts.push(host);
   }
@@ -1229,7 +1237,7 @@ function nodeSize(host: HostObservation) {
 }
 
 function nodeClass(host: HostObservation) {
-  return categoryFor(host).replaceAll("/", "-").replaceAll(" ", "-");
+  return categoryClass(categoryFor(host));
 }
 
 function nodeInitial(host: HostObservation) {

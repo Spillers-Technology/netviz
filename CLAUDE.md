@@ -58,12 +58,16 @@ longer accurate. v0.0.1 now includes:
 - v0.1.0: `netviz-probe` always-on LAN probe that pushes device inventory to a
   AnchorDesk backend with heartbeat reporting, installable as a Windows
   service, systemd unit, or launchd job. Released June 19, 2026.
-- v0.1.x: desktop probe management — GUI installs/manages the headless probe
+- v0.2.0: desktop probe management — GUI installs/manages the headless probe
   service and edits its shared config file; the service, not the GUI, runs the
-  report loop (fast-follow).
-- v0.1.5: server ingest mode and Docker image at `ghcr.io/spillers-technology/netviz`.
-- v0.1.9: hosted/server model with multi-tenancy, probe enrollment, and tokens.
-- v0.2.0: polish, hardening, performance, accessibility, and docs.
+  report loop. Released July 2, 2026.
+- v0.3.0: server ingest mode and Docker image at `ghcr.io/spillers-technology/netviz`
+  (single-tenant; multi-tenancy is dropped from the roadmap — AnchorDesk owns
+  tenancy, each probe reports to its own company).
+- v0.4.0: polish, hardening, performance, packaging/signing, updater
+  completion, vendor enrichment, per-device history, and docs.
+- v1.0.0: stability freeze — frozen probe contract v1, versioned file/config/
+  schema formats with migration, semver policy, and a security posture doc.
 
 ## What Not To Build Yet
 
@@ -75,7 +79,7 @@ longer accurate. v0.0.1 now includes:
 - No credential handling.
 - No RMM-like workflows.
 - No server ingest before the server milestone.
-- No multi-tenancy before the hosted/server milestone.
+- No multi-tenancy at all — AnchorDesk owns tenancy; NetViz stays single-site.
 
 ## Commands
 
