@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(kubectl get *)",
+      "Bash(kubectl kustomize *)",
+      "Bash(kubectl logs *)",
+      "Bash(kubectl describe *)",
+      "Bash(kubectl version)",
+      "Bash(npx tsc *)",
+      "Bash(npx jest *)",
+      "Bash(npm test)",
+      "Bash(npm run lint)",
+      "Bash(dotnet test *)",
+      "PowerShell(npm test)",
+      "PowerShell(npm run lint)",
+      "PowerShell(dotnet test *)",
+      "PowerShell(go test *)",
+      "PowerShell(go vet *)",
+      "PowerShell(go build *)",
+      "PowerShell(npx tsc *)",
+      "PowerShell(npx jest *)"
+    ]
+  }
+}

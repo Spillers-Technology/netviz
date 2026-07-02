@@ -299,13 +299,39 @@ func (a *App) consumeEvents(events <-chan model.ScanEvent) {
 	a.mu.Unlock()
 
 	if history != nil && run.ID != "" && len(hosts) > 0 {
-		if err := history.SaveScanRun(context.Background(), run, hosts); err != nil {
+		if _, err := history.SaveScanRunCoalesced(context.Background(), run, hosts); err != nil {
 			runtime.EventsEmit(a.ctx, "history:error", err.Error())
 		} else {
+			if _, err := history.PruneScanRuns(context.Background(), desktopRunsKept); err != nil {
+				runtime.EventsEmit(a.ctx, "history:error", err.Error())
+			}
 			runtime.EventsEmit(a.ctx, "history:updated", nil)
 		}
 	}
 	runtime.EventsEmit(a.ctx, "scan:state", map[string]any{"scanning": false})
+}
+
+// desktopRunsKept bounds local history. Coalescing already collapses idle
+// monitor cycles, so 200 runs is roughly 200 observed changes of state.
+const desktopRunsKept = 200
+
+// HostHistory returns the stored observations of one IP, newest first, for
+// the device detail panel.
+func (a *App) HostHistory(ip string) ([]storage.HostHistoryEntry, error) {
+	a.mu.Lock()
+	history := a.history
+	a.mu.Unlock()
+	if history == nil || ip == "" {
+		return []storage.HostHistoryEntry{}, nil
+	}
+	entries, err := history.HostHistory(context.Background(), ip, 25)
+	if err != nil {
+		return nil, err
+	}
+	if entries == nil {
+		entries = []storage.HostHistoryEntry{}
+	}
+	return entries, nil
 }
 
 func (a *App) snapshotHosts() []model.HostObservation {

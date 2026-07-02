@@ -508,6 +508,38 @@ tbody tr:hover td {
   gap: 10px;
 }
 
+.miniHistory {
+  display: grid;
+  gap: 8px;
+}
+
+.miniHistory p {
+  margin: 0;
+}
+
+.miniHistoryList {
+  display: grid;
+  gap: 4px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.miniHistoryRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.miniHistoryRow .miniHistoryTime {
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .portsPanel p {
   margin: 0;
   color: var(--text-muted);

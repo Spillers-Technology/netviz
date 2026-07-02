@@ -283,22 +283,33 @@ is single-site by definition and would gain nothing but complexity.
 
 Goal: make NetViz reliable and pleasant enough for broader FOSS use.
 
-Features:
+Status: shipped July 2, 2026.
 
-- Packaging improvements: Windows installer/code signing and macOS
-  notarization so releases install without SmartScreen/Gatekeeper friction.
-- Finish the updater: in-place replacement of the running desktop executable
-  (v0.2.0 stages verified archives but does not install them).
-- Better error states.
-- Performance tuning for common LAN sizes.
-- UX and visibility pass: validated color palette, keyboard focus states,
-  legends for the visual views, and contrast checks run as part of review.
-- More robust vendor enrichment (bundled OUI database rather than ARP-cache
-  vendor lookup alone).
-- Per-device history in the detail panel backed by local scan history, with a
-  retention cutoff so monitor mode cannot grow the database without bound.
-- Documentation examples.
-- Release checklist.
+Done:
+
+- Updater completion: Install and Restart extracts the desktop binary from
+  the checksum-verified archive and swaps it in place (Windows helper waits
+  for exit, swaps, relaunches; Linux renames immediately; previous binary is
+  kept as a `.old` backup).
+- Vendor enrichment: embedded IEEE OUI registry snapshot (~40k prefixes) in
+  `internal/oui` behind the curated short-name table; classifier extended
+  with more network/printer vendors.
+- Per-device history in the detail panel from local SQLite history, with
+  monitor-mode coalescing (identical scans extend the previous run instead
+  of inserting) and retention pruning (newest 200 runs).
+- Emoji device icons across the hierarchy circles, legends, group headers,
+  and detail panel.
+- UX and visibility pass: validated palette, focus states, legends
+  (shipped through v0.2.0–v0.3.0 and this release).
+- Release checklist added to RELEASING.md.
+
+Deferred:
+
+- Windows code signing and macOS notarization: requires certificates
+  (an EV/OV code-signing cert and an Apple Developer ID). Tracked as a
+  v1.0.0 acceptance criterion; everything codeable around it is done.
+- Deep accessibility audit and performance profiling beyond the /24
+  responsiveness bar — ongoing work, not release-gated here.
 
 Non-goals:
 
@@ -307,9 +318,10 @@ Non-goals:
 
 Acceptance criteria:
 
-- Release artifacts are reproducible.
-- Common install paths are documented.
-- UI remains responsive during expected scans.
+- Release artifacts are reproducible. (workflows are pinned; builds are
+  deterministic modulo Go/wails toolchain versions)
+- Common install paths are documented. (done)
+- UI remains responsive during expected scans. (done for /24)
 
 ## v0.5.0: Server Sign-In and SSO
 

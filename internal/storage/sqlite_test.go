@@ -9,6 +9,60 @@ import (
 	"github.com/Spillers-Technology/netviz/internal/model"
 )
 
+func TestSaveScanRunCoalesced(t *testing.T) {
+	ctx := context.Background()
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "netviz.db"))
+	if err != nil {
+		t.Fatalf("OpenSQLite: %v", err)
+	}
+	defer store.Close()
+
+	start := time.Now().UTC()
+	hosts := []model.HostObservation{host("192.168.1.10", "same.local", true, "web_device", 80)}
+
+	first := model.ScanRun{ID: "first", CIDR: "192.168.1.0/24", StartedAt: start}
+	if coalesced, err := store.SaveScanRunCoalesced(ctx, first, hosts); err != nil || coalesced {
+		t.Fatalf("first save: coalesced=%v err=%v, want new run", coalesced, err)
+	}
+
+	// Identical state (fresh timestamps) must coalesce, not insert.
+	again := model.ScanRun{ID: "second", CIDR: "192.168.1.0/24", StartedAt: start.Add(time.Minute), EndedAt: start.Add(time.Minute)}
+	sameHosts := []model.HostObservation{host("192.168.1.10", "same.local", true, "web_device", 80)}
+	sameHosts[0].LastUpdate = start.Add(time.Minute)
+	if coalesced, err := store.SaveScanRunCoalesced(ctx, again, sameHosts); err != nil || !coalesced {
+		t.Fatalf("identical save: coalesced=%v err=%v, want coalesced", coalesced, err)
+	}
+
+	runs, err := store.ListScanRuns(ctx, 10)
+	if err != nil {
+		t.Fatalf("ListScanRuns: %v", err)
+	}
+	if len(runs) != 1 || runs[0].ID != "first" {
+		t.Fatalf("after coalesce: got %d runs (first=%v), want the original run only", len(runs), runs)
+	}
+	if !runs[0].EndedAt.After(start.Add(30 * time.Second)) {
+		t.Fatalf("coalesced run ended_at not extended: %v", runs[0].EndedAt)
+	}
+
+	// A real change (port flip) must create a new run.
+	changed := model.ScanRun{ID: "third", CIDR: "192.168.1.0/24", StartedAt: start.Add(2 * time.Minute)}
+	changedHosts := []model.HostObservation{host("192.168.1.10", "same.local", true, "web_device", 80, 443)}
+	if coalesced, err := store.SaveScanRunCoalesced(ctx, changed, changedHosts); err != nil || coalesced {
+		t.Fatalf("changed save: coalesced=%v err=%v, want new run", coalesced, err)
+	}
+
+	history, err := store.HostHistory(ctx, "192.168.1.10", 10)
+	if err != nil {
+		t.Fatalf("HostHistory: %v", err)
+	}
+	if len(history) != 2 {
+		t.Fatalf("host history entries: got %d, want 2 (idle runs coalesced)", len(history))
+	}
+	if history[0].RunID != "third" || len(history[0].Host.OpenPorts) != 2 {
+		t.Fatalf("newest history entry: %+v, want run third with 2 ports", history[0])
+	}
+}
+
 func TestPruneScanRuns(t *testing.T) {
 	ctx := context.Background()
 	store, err := OpenSQLite(filepath.Join(t.TempDir(), "netviz.db"))

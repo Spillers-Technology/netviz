@@ -18,6 +18,9 @@ func ClassifyHost(host model.HostObservation) string {
 		strings.Contains(vendor, "canon"),
 		strings.Contains(vendor, "epson"),
 		strings.Contains(vendor, "hewlett packard"),
+		strings.Contains(vendor, "hp inc"),
+		strings.Contains(vendor, "lexmark"),
+		strings.Contains(vendor, "kyocera"),
 		strings.Contains(hostname, "printer"):
 		return "printer"
 	case strings.Contains(vendor, "ubiquiti"),
@@ -26,6 +29,10 @@ func ClassifyHost(host model.HostObservation) string {
 		strings.Contains(vendor, "cisco"),
 		strings.Contains(vendor, "d-link"),
 		strings.Contains(vendor, "zyxel"),
+		strings.Contains(vendor, "mikrotik"),
+		strings.Contains(vendor, "juniper"),
+		strings.Contains(vendor, "aruba"),
+		strings.Contains(vendor, "fortinet"),
 		strings.Contains(hostname, "gateway"),
 		strings.Contains(hostname, "router"):
 		return "network_device"
