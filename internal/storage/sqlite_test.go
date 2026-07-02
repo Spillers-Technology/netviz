@@ -9,6 +9,47 @@ import (
 	"github.com/Spillers-Technology/netviz/internal/model"
 )
 
+func TestPruneScanRuns(t *testing.T) {
+	ctx := context.Background()
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "netviz.db"))
+	if err != nil {
+		t.Fatalf("OpenSQLite: %v", err)
+	}
+	defer store.Close()
+
+	start := time.Now().UTC()
+	for i, id := range []string{"oldest", "middle", "newest"} {
+		run := model.ScanRun{ID: id, CIDR: "192.168.1.0/24", StartedAt: start.Add(time.Duration(i) * time.Minute)}
+		hosts := []model.HostObservation{host("192.168.1.10", id+".local", true, "web_device", 80)}
+		if err := store.SaveScanRun(ctx, run, hosts); err != nil {
+			t.Fatalf("SaveScanRun %s: %v", id, err)
+		}
+	}
+
+	removed, err := store.PruneScanRuns(ctx, 2)
+	if err != nil {
+		t.Fatalf("PruneScanRuns: %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("removed %d runs, want 1", removed)
+	}
+
+	runs, err := store.ListScanRuns(ctx, 10)
+	if err != nil {
+		t.Fatalf("ListScanRuns: %v", err)
+	}
+	if len(runs) != 2 || runs[0].ID != "newest" || runs[1].ID != "middle" {
+		t.Fatalf("unexpected surviving runs: %#v", runs)
+	}
+
+	if hosts, err := store.HostsForRun(ctx, "oldest"); err != nil || len(hosts) != 0 {
+		t.Fatalf("pruned run observations: hosts=%v err=%v, want none", hosts, err)
+	}
+	if hosts, err := store.HostsForRun(ctx, "newest"); err != nil || len(hosts) != 1 {
+		t.Fatalf("kept run observations: hosts=%v err=%v, want 1", hosts, err)
+	}
+}
+
 func TestSQLiteStoreSaveListAndDiff(t *testing.T) {
 	ctx := context.Background()
 	store, err := OpenSQLite(filepath.Join(t.TempDir(), "netviz.db"))

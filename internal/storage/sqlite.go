@@ -152,6 +152,35 @@ func (s *SQLiteStore) HostsForRun(ctx context.Context, runID string) ([]model.Ho
 	return hosts, rows.Err()
 }
 
+// PruneScanRuns deletes all but the newest keep runs and their host
+// observations, returning how many runs were removed. Observations are
+// deleted explicitly rather than via the FK cascade so pruning does not
+// depend on per-connection PRAGMA state.
+func (s *SQLiteStore) PruneScanRuns(ctx context.Context, keep int) (int, error) {
+	if keep < 1 {
+		keep = 1
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	const keepQuery = `SELECT id FROM scan_runs ORDER BY started_at DESC LIMIT ?`
+	if _, err := tx.ExecContext(ctx, `DELETE FROM host_observations WHERE run_id NOT IN (`+keepQuery+`)`, keep); err != nil {
+		return 0, err
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM scan_runs WHERE id NOT IN (`+keepQuery+`)`, keep)
+	if err != nil {
+		return 0, err
+	}
+	removed, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(removed), tx.Commit()
+}
+
 func (s *SQLiteStore) DiffLatest(ctx context.Context) (*model.ScanDiff, error) {
 	runs, err := s.ListScanRuns(ctx, 2)
 	if err != nil {

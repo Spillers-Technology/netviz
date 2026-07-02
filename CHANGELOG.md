@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.3.0 — 2026-07-02
+
+Adds single-tenant server ingest and a real web UI. A `netviz-probe` can now
+push to a self-hosted `netviz-server` using the exact same wire contract it
+uses for AnchorDesk — change the URL and key, nothing else.
+
+Added:
+
+- Server ingest: `POST /probe/devices` and `POST /probe/heartbeat` implement
+  the v1 probe contract with `X-Probe-Key` auth. Ingest is deny-by-default:
+  without `-ingest-key`/`NETVIZ_INGEST_KEY` the endpoints answer 503.
+- Each device push is stored as a scan run with host observations in the
+  shared SQLite store (`-db`, default `netviz-server.db`); retention pruning
+  keeps the newest 500 runs.
+- `GET /api/state` returns the latest run, its devices, and the most recent
+  probe heartbeat; `GET /api/scans` lists stored runs.
+- Embedded web UI (React, served from the binary): stat tiles, probe
+  heartbeat freshness badge, sortable-density device table, and an
+  interactive canvas network map — devices cluster by type around the LAN
+  hub in a phyllotaxis layout with bundled curved edges, live-device glow,
+  hover tooltips, click-to-inspect details, wheel zoom, drag pan, and a
+  clickable category legend. Add `?demo` to the URL to preview the map with
+  generated sample data.
+- The map reuses the desktop's CVD-validated device-type palette; offline
+  devices render as hollow rings so state never rides on color alone, and
+  `prefers-reduced-motion` disables the ambient animation.
+- Docker image now persists to a `/data` volume and the compose file wires
+  `NETVIZ_INGEST_KEY`; the image publishes to
+  `ghcr.io/spillers-technology/netviz` on release tags.
+- `make build-web` rebuilds the web UI into `internal/server/webdist`
+  (committed, so `go build` and the Docker build never need node).
+- Storage: `PruneScanRuns` retention helper with tests.
+- Meet-in-the-middle contract test drives the real probe client against the
+  server: devices created on first push, updated on re-push, no duplicates.
+
+Notes:
+
+- The web UI has no sign-in yet; run the server on a trusted network. SSO
+  (OIDC first-class) lands in v0.5.0 and is required before 1.0.0.
+- Multi-tenancy is out of scope permanently — AnchorDesk owns tenancy.
+
 ## v0.2.0 — 2026-07-02
 
 Added:

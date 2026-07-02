@@ -1,4 +1,4 @@
-.PHONY: test lint build-cli build-server build-probe build-desktop docker-build docker-run
+.PHONY: test lint build-cli build-server build-probe build-desktop build-web docker-build docker-run
 
 IMAGE ?= ghcr.io/spilloid/netviz
 
@@ -19,6 +19,11 @@ build-probe:
 
 build-desktop:
 	cd desktop && wails build
+
+# Rebuilds the server web UI into internal/server/webdist (committed so plain
+# `go build` works without node).
+build-web:
+	cd web && npm install && npm run build
 
 docker-build:
 	docker build -f deploy/Dockerfile -t $(IMAGE):local .
