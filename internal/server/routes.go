@@ -12,6 +12,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/scans", s.scans)
 	s.mux.HandleFunc("POST /probe/devices", s.probeDevices)
 	s.mux.HandleFunc("POST /probe/heartbeat", s.probeHeartbeat)
+	s.mux.HandleFunc("GET /auth/login", s.authLogin)
+	s.mux.HandleFunc("GET /auth/callback", s.authCallback)
+	s.mux.HandleFunc("GET /auth/logout", s.authLogout)
+	s.mux.HandleFunc("POST /auth/logout", s.authLogout)
+	s.mux.HandleFunc("GET /api/me", s.me)
 	s.mux.Handle("GET /", s.webHandler())
 }
 

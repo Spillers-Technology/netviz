@@ -262,7 +262,7 @@ Done:
 Non-goals:
 
 - Multi-tenancy (dropped from the roadmap — see below).
-- Web UI sign-in (v0.5.0 adds SSO; run the server on a trusted network until
+- Web UI sign-in (v0.9.0 adds SSO; run the server on a trusted network until
   then).
 
 Acceptance criteria:
@@ -323,11 +323,15 @@ Acceptance criteria:
 - Common install paths are documented. (done)
 - UI remains responsive during expected scans. (done for /24)
 
-## v0.5.0: Server Sign-In and SSO
+## v0.9.0: Server Sign-In and SSO
 
 Goal: put the server web UI and read APIs behind authenticated sign-in so a
 NetViz server can sit somewhere more hostile than a trusted LAN segment.
 Required before 1.0.0.
+
+Status: shipped July 2, 2026, together with the stability-freeze docs
+(SECURITY.md posture/threat model, README compatibility and semver policy),
+so v1.0.0 reduces to signing the frozen v0.9 feature set.
 
 Features:
 
@@ -351,30 +355,35 @@ Non-goals:
 Acceptance criteria:
 
 - With OIDC configured, all web/API routes except `/healthz` and the probe
-  endpoints require a session.
-- Sign-in round-trips against at least one real IdP and one local Keycloak.
-- Session cookies are Secure, HttpOnly, SameSite; secrets never land in
-  process listings.
+  endpoints require a session. (done; middleware tests)
+- Sign-in round-trips against an OIDC issuer. (done against an in-process
+  issuer with RSA-signed id_tokens covering discovery, PKCE, state, token
+  exchange, and JWKS verification; validate once against your real IdP —
+  the flow is standard Authorization Code + PKCE)
+- Session cookies are Secure (on https), HttpOnly, SameSite=Lax; secrets
+  arrive via environment, never process listings. (done)
 
-## v1.0.0: Stability Freeze
+Deferred:
 
-Goal: commit to the compatibility guarantees that make NetViz safe to depend
-on. Mostly declarations plus the tests and migrations that back them.
+- SAML2 (demand-driven; no deployment has asked yet).
+- Local break-glass admin credential (revisit if an IdP outage bites).
 
-Features:
+## v1.0.0: Signed Release on the Frozen v0.9 Feature Set
 
-- AnchorDesk probe contract v1 frozen and documented; any change bumps the
-  contract version on both sides together.
-- Versioned formats with migration or an explicit compatibility statement:
-  scan-data files, CSV export, probe config file, and the SQLite history
-  schema.
-- Documented semver policy: CLI flags, file formats, wire contract, and config
-  are covered; internal Go packages are not.
-- Security posture doc: probe threat model (API key on customer LANs, runs as
-  SYSTEM/root), key rotation guidance, and a security review of the server
-  ingest surface.
-- Complete install and deployment docs for desktop, probe, and server on all
-  supported platforms, with current screenshots.
+Goal: v1.0.0 is v0.9.x plus trust: signed/notarized binaries and a final
+validation pass. The stability commitments shipped with v0.9.0:
+
+- Probe contract v1 frozen and documented (SECURITY.md, `internal/anchordesk`).
+- Compatibility/semver policy documented (README: wire contract, CLI flags,
+  file formats, SQLite schema migration).
+- Security posture and threat model documented (SECURITY.md).
+
+Remaining for 1.0.0:
+
+- Windows code signing (EV/OV certificate) and macOS notarization (Apple
+  Developer ID) wired into the release workflow.
+- One live sign-in validation against the production IdP.
+- Screenshot refresh and final docs pass.
 
 Acceptance criteria:
 
@@ -382,7 +391,7 @@ Acceptance criteria:
   from the GUI, point it at a self-hosted Docker server or AnchorDesk, and
   later upgrade all three components without losing history or breaking the
   wire contract.
-- A server exposed beyond a trusted LAN requires SSO sign-in (v0.5.0).
+- A server exposed beyond a trusted LAN requires SSO sign-in (v0.9.0).
 - `go test ./...`, `go vet ./...`, and frontend builds pass on all release
   platforms.
 - Upgrading from the previous release preserves local history and probe

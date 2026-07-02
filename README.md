@@ -193,6 +193,20 @@ Probe endpoints are disabled until an ingest key is configured
 (`-ingest-key` or `NETVIZ_INGEST_KEY`). Open `http://server-host:8080/?demo`
 to preview the map with sample data before wiring a probe.
 
+To require SSO sign-in for the web UI and read APIs, point the server at any
+OIDC identity provider (Entra ID, Google, Keycloak, Authentik):
+
+```sh
+netviz-server -oidc-issuer https://login.example.com/realms/main \
+  -oidc-client-id netviz -public-url https://netviz.example.com
+# NETVIZ_OIDC_CLIENT_SECRET and NETVIZ_SESSION_SECRET via environment
+```
+
+Register `<public-url>/auth/callback` as the redirect URI with your IdP.
+Without `-oidc-issuer` the server runs in trusted-LAN mode (no web sign-in)
+and says so at startup. Probe endpoints always authenticate with the ingest
+key — machines don't do SSO.
+
 The SQLite history store uses the pure-Go `modernc.org/sqlite` driver, so no
 CGO is required.
 
@@ -232,16 +246,35 @@ Future consumers    websocket event streamer
   and heartbeat reporting
 - **v0.2.0** — desktop probe management GUI and release updater
 - **v0.3.0** — single-tenant server ingest, web UI network map, and Docker
-  image at `ghcr.io/spillers-technology/netviz` *(current)*
-- **v0.4.0** — polish: packaging/signing, updater completion, vendor
-  enrichment, per-device history
-- **v0.5.0** — server sign-in with SSO (OIDC; SAML2 as needed)
-- **v1.0.0** — stability freeze: frozen probe contract, versioned formats,
-  semver policy, security posture
+  image at `ghcr.io/spillers-technology/netviz`
+- **v0.4.0** — vendor enrichment (IEEE OUI), per-device history, updater
+  in-place install, emoji device icons
+- **v0.9.0** — server sign-in with OIDC SSO; stability-freeze docs
+  *(current)*
+- **v1.0.0** — signed/notarized binaries on the frozen v0.9 feature set
 
 See [MILESTONES.md](MILESTONES.md) for acceptance criteria,
 [CHANGELOG.md](CHANGELOG.md) for release notes, and
 [RELEASING.md](RELEASING.md) for the build/release process.
+
+---
+
+## Compatibility and semver
+
+From v1.0.0, NetViz follows semantic versioning over these surfaces:
+
+- **Probe wire contract v1** (`/probe/devices`, `/probe/heartbeat`,
+  `X-Probe-Key`, shapes in `internal/anchordesk`): frozen; breaking changes
+  bump the contract version on both ends together.
+- **CLI flags** for `netviz-cli`, `netviz-probe`, and `netviz-server`:
+  existing flags keep their meaning; removals are major-version events.
+- **File formats**: saved scan JSON, CSV export, and the probe config file
+  stay readable across minor versions.
+- **SQLite history schema**: migrated in place on open; upgrading NetViz
+  never loses local history.
+
+Internal Go packages (`internal/...`) are **not** a supported API surface.
+Security posture and threat model live in [SECURITY.md](SECURITY.md).
 
 ---
 

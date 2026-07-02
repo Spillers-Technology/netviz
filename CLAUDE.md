@@ -70,7 +70,7 @@ longer accurate. v0.0.1 now includes:
   tenancy, each probe reports to its own company).
 - v0.4.0: polish, hardening, performance, packaging/signing, updater
   completion, vendor enrichment, per-device history, and docs.
-- v0.5.0: server sign-in with SSO — OIDC first-class, SAML2 demand-driven;
+- v0.9.0: server sign-in with SSO — OIDC first-class, SAML2 demand-driven;
   probe endpoints keep key auth. Required before 1.0.0.
 - v1.0.0: stability freeze — frozen probe contract v1, versioned file/config/
   schema formats with migration, semver policy, and a security posture doc.

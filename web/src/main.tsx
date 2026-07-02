@@ -13,6 +13,15 @@ function App() {
   const [state, setState] = useState<ServerState | null>(null);
   const [error, setError] = useState("");
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
+  const [identity, setIdentity] = useState<{ auth: boolean; email?: string; name?: string } | null>(null);
+
+  useEffect(() => {
+    if (demo) return;
+    fetch("/api/me")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((me) => setIdentity(me))
+      .catch(() => {});
+  }, [demo]);
 
   async function refresh() {
     if (demo) {
@@ -55,6 +64,11 @@ function App() {
         </div>
         <div className="topActions">
           <ProbeBadge probe={state?.probe} />
+          {identity?.auth && (
+            <span className="identity">
+              {identity.name || identity.email || "signed in"} · <a href="/auth/logout">sign out</a>
+            </span>
+          )}
           <button onClick={() => void refresh()}>Refresh</button>
         </div>
       </header>

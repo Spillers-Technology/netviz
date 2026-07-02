@@ -10,6 +10,12 @@ services:
       # Probes authenticate with this key on X-Probe-Key. Ingest is disabled
       # until it is set.
       NETVIZ_INGEST_KEY: ${NETVIZ_INGEST_KEY:?set NETVIZ_INGEST_KEY}
+      # Optional OIDC SSO for the web UI; leave unset for trusted-LAN mode.
+      NETVIZ_OIDC_ISSUER: ${NETVIZ_OIDC_ISSUER:-}
+      NETVIZ_OIDC_CLIENT_ID: ${NETVIZ_OIDC_CLIENT_ID:-}
+      NETVIZ_OIDC_CLIENT_SECRET: ${NETVIZ_OIDC_CLIENT_SECRET:-}
+      NETVIZ_PUBLIC_URL: ${NETVIZ_PUBLIC_URL:-}
+      NETVIZ_SESSION_SECRET: ${NETVIZ_SESSION_SECRET:-}
     volumes:
       - netviz-data:/data
 
