@@ -112,29 +112,29 @@ Acceptance criteria:
 - Diff results are visible in table and visual views.
 - History can be reset intentionally.
 
-## v0.1.0: Headless Probe and MaterialTicket Reporting
+## v0.1.0: Headless Probe and AnchorDesk Reporting
 
 Goal: ship `netviz-probe` as an always-on LAN probe that a tech can drop on a
 box at a customer site, where it scans on an interval and feeds live device
-inventory to a MaterialTicket backend.
+inventory to an AnchorDesk backend.
 
-Status: released June 19, 2026. Core probe and MaterialTicket reporting, native
+Status: released June 19, 2026. Core probe and AnchorDesk reporting, native
 service management, transport/retry tests, deployment docs, cross-platform
-builds, and the live MaterialTicket contract test are complete.
+builds, and the live AnchorDesk contract test are complete.
 
 Done:
 
 - `netviz-probe` binary with no desktop, Wails, or UI dependencies.
 - Scans a configured CIDR using the shared scanner core and host observation
   model.
-- MaterialTicket integration: `internal/materialticket` serializes scan results
-  to the MaterialTicket probe device contract (v1) and pushes them to
+- AnchorDesk integration: `internal/anchordesk` serializes scan results
+  to the AnchorDesk probe device contract (v1) and pushes them to
   `POST /probe/devices` after each completed scan. Upsert-keyed (id falls back
   mac → ip) so re-scans update devices instead of duplicating them.
 - Periodic `POST /probe/heartbeat` liveness reporting that carries the probe
   version and scanned CIDR.
-- Flag and environment configuration for the MaterialTicket URL and probe API
-  key (`-url`/`-key`, `NETVIZ_MATERIALTICKET_URL`/`NETVIZ_MATERIALTICKET_KEY`).
+- Flag and environment configuration for the AnchorDesk URL and probe API
+  key (`-url`/`-key`, `NETVIZ_ANCHORDESK_URL`/`NETVIZ_ANCHORDESK_KEY`).
 - Continuous (interval) and `-once` run modes with graceful SIGINT/SIGTERM
   shutdown.
 - In-memory retry with bounded backoff so a failed push is held for the next
@@ -146,17 +146,17 @@ Done:
   (`kardianos/service`): `install`/`uninstall`/`start`/`stop` subcommands that
   register the probe as a Windows service, a Linux systemd unit, or a macOS
   launchd job.
-- Unit tests for the MaterialTicket transport client (`client.go`): header,
+- Unit tests for the AnchorDesk transport client (`client.go`): header,
   non-2xx handling, and retry behavior.
 - Probe deployment doc (service install, env/flag config, host-network note).
-- Live meet-in-the-middle test against a running MaterialTicket: confirm
+- Live meet-in-the-middle test against a running AnchorDesk: confirm
   `created > 0`, then `updated > 0` on re-scan with no duplicates.
 
 Non-goals:
 
 - Probe Docker image (decided against; host-network requirement makes it more
   footgun than convenience for the on-prem case).
-- Standalone stdout JSON output (the MaterialTicket push is the reporting path;
+- Standalone stdout JSON output (the AnchorDesk push is the reporting path;
   not a v0.1.0 requirement).
 - Multi-CIDR / multi-VLAN scanning (single `-cidr` for now).
 - Persisting unsent records across probe restarts (next full scan re-pushes
@@ -169,13 +169,13 @@ Acceptance criteria:
 
 - Probe runs without desktop dependencies. (done)
 - Probe uses the same event/observation model as the desktop and CLI. (done)
-- MaterialTicket push and heartbeat match the v1 contract and are documented.
+- AnchorDesk push and heartbeat match the v1 contract and are documented.
   (done)
 - Probe installs and runs as a Windows service, systemd unit, and launchd job.
   (implemented; systemd lifecycle passed, Windows registration reaches the
   native service manager and requires elevation as expected)
 - Transport client has unit coverage. (done)
-- Live MaterialTicket test passes: devices created on first scan, updated on
+- Live AnchorDesk test passes: devices created on first scan, updated on
   re-scan, no duplicates. (done: 1 created, then 1 updated, 1 total device)
 
 ## v0.1.x: Desktop Probe Management (fast-follow)
@@ -184,13 +184,23 @@ Goal: make the desktop GUI the control surface for the headless probe service �
 deploy it and edit its config — without the GUI ever running the report loop
 itself. The service stays the durable runner; the GUI is a front-end.
 
+Status: first slice in progress. The desktop Probe tab can locate the probe
+binary, collect AnchorDesk URL/key/interval, use the current desktop CIDR,
+install/start the persistent service, run a foreground `-once` push, and manage
+start/stop/restart/uninstall/status. GUI-managed probes use a shared
+service-readable config file and the service re-reads it before each scan
+cycle. The desktop app also has an optional GitHub Releases updater that checks
+for newer platform archives, prompts before download, and verifies checksums.
+Last-push telemetry is still pending.
+
 Features:
 
-- Deploy from the GUI: install, start, stop, and uninstall the `netviz-probe`
-  service (the same `kardianos/service` path as the CLI subcommands). Install
-  requires elevation (UAC / root), which the GUI prompts for or documents.
-- Edit probe config from the GUI: MaterialTicket URL, probe key, CIDR, and
-  interval.
+- Deploy from the GUI: install, start, stop, restart, status, and uninstall the
+  `netviz-probe` service by invoking the same probe binary and service
+  subcommands. Install requires elevation (UAC / root), which the GUI documents.
+- Edit probe config from the GUI: AnchorDesk URL, probe key, CIDR, and
+  interval. Repeating provisioning updates the shared config file and is
+  idempotent for GUI-managed services.
 - Shared config file in a system-wide, service-readable location (e.g.
   `ProgramData` on Windows, `/etc/netviz` on Linux) so the logged-in GUI user
   and the SYSTEM/root service account both reach the same file.
@@ -198,6 +208,9 @@ Features:
   edits take effect without a manual service restart.
 - Service status in the GUI: installed/running state, last successful push, and
   online indication.
+- Optional desktop update flow: check GitHub Releases, select the current
+  platform archive, verify the `.sha256` checksum, and stage the download
+  without silent installation.
 
 Non-goals:
 
@@ -207,8 +220,8 @@ Non-goals:
 
 Acceptance criteria:
 
-- A tech can install, configure, and manage the probe service entirely from the
-  GUI.
+- A tech can install, configure, and manage the probe service from the GUI when
+  the desktop app is launched with service-manager privileges.
 - Config edited in the GUI is picked up by the running service without a manual
   restart.
 

@@ -64,6 +64,13 @@ the first time:
   to CSV from the File menu.
 - **Local history** — completed scans are stored in a local SQLite database, and
   NetViz can diff the two most recent runs.
+- **Probe setup from the desktop app** — configure AnchorDesk reporting
+  details in the Probe tab and install/start the persistent `netviz-probe`
+  service using the current CIDR. GUI-managed probes use a shared config file
+  so reopening the app shows the existing probe settings.
+- **Optional updates** — the desktop app checks GitHub Releases, prompts when a
+  newer platform build is available, downloads on request, and verifies the
+  release checksum when one is published.
 
 NetViz is intentionally focused. It is **not** an Nmap wrapper, vulnerability
 scanner, credential tool, remote shell, or RMM platform. No raw packet scanning,
@@ -92,7 +99,7 @@ netviz-cli diff
 
 `netviz-probe` is a headless build of the scanner for unattended use on a LAN.
 It runs the same scan engine as the desktop app and CLI, then pushes the devices
-it finds to a **MaterialTicket** backend — so a NetViz instance deployed on a
+it finds to a **AnchorDesk** backend — so a NetViz instance deployed on a
 customer network can feed live device inventory into tickets.
 
 ```sh
@@ -105,9 +112,9 @@ netviz-probe -cidr 192.168.1.0/24 -interval 60s \
   -url https://rmm.example.com -key <probe-api-key>
 
 # Install the same configuration as an OS service (run as Administrator/root)
-export NETVIZ_MATERIALTICKET_URL=https://rmm.example.com
-export NETVIZ_MATERIALTICKET_KEY=<probe-api-key>
-sudo --preserve-env=NETVIZ_MATERIALTICKET_URL,NETVIZ_MATERIALTICKET_KEY \
+export NETVIZ_ANCHORDESK_URL=https://rmm.example.com
+export NETVIZ_ANCHORDESK_KEY=<probe-api-key>
+sudo --preserve-env=NETVIZ_ANCHORDESK_URL,NETVIZ_ANCHORDESK_KEY \
   ./netviz-probe install -cidr 192.168.1.0/24 -interval 60s
 sudo ./netviz-probe start
 sudo ./netviz-probe status
@@ -116,9 +123,10 @@ sudo ./netviz-probe status
 | Flag | Purpose |
 | --- | --- |
 | `-cidr` | IPv4 CIDR to scan (required) |
-| `-url` | MaterialTicket base URL (or `NETVIZ_MATERIALTICKET_URL`) |
-| `-key` | Probe API key, sent as `X-Probe-Key` (or `NETVIZ_MATERIALTICKET_KEY`) |
+| `-url` | AnchorDesk base URL (or `NETVIZ_ANCHORDESK_URL`) |
+| `-key` | Probe API key, sent as `X-Probe-Key` (or `NETVIZ_ANCHORDESK_KEY`) |
 | `-interval` | Heartbeat / re-scan interval (default `1m`) |
+| `-config` | Shared JSON config file for service/GUI-managed probes |
 | `-once` | Scan once, push, and exit instead of running continuously |
 
 Service commands are `install`, `start`, `stop`, `restart`, `status`, and
@@ -126,16 +134,16 @@ Service commands are `install`, `start`, `stop`, `restart`, `status`, and
 or launchd daemon. Put the binary in its permanent location before installing
 because the service registration points to that exact path.
 
-The URL and key can come from the environment (`NETVIZ_MATERIALTICKET_URL`,
-`NETVIZ_MATERIALTICKET_KEY`), which keeps the key out of process listings and
-shell history. The API key is issued once when an admin registers the probe in
-MaterialTicket. After each scan the probe `POST`s its devices to `/probe/devices`
-(upsert-keyed, so re-scans don't duplicate) and keeps itself marked online via
-periodic `/probe/heartbeat`. A failed push is retried on the next cycle, not
-dropped. The probe has no desktop, Wails, or UI dependencies.
+The URL and key can come from the environment (`NETVIZ_ANCHORDESK_URL`,
+`NETVIZ_ANCHORDESK_KEY`) or from a shared config file. The API key is issued
+once when an admin registers the probe in AnchorDesk. After each scan the probe
+`POST`s its devices to `/probe/devices` (upsert-keyed, so re-scans don't
+duplicate) and keeps itself marked online via periodic `/probe/heartbeat`. A
+failed push is retried on the next cycle, not dropped. The probe has no desktop,
+Wails, or UI dependencies.
 
 See [PROBE_DEPLOYMENT.md](PROBE_DEPLOYMENT.md) for complete Windows, Linux, and
-macOS install, logging, upgrade, and troubleshooting instructions.
+macOS GUI/CLI install, logging, upgrade, and troubleshooting instructions.
 
 ---
 
@@ -187,7 +195,7 @@ JSON, file export, and SQLite history — consumes the same typed event stream.
 Current consumers   Desktop table · grouped graph · hierarchy map
                     CLI JSON output · file save/open · CSV export
                     SQLite history + diff · monitor mode
-                    netviz-probe MaterialTicket reporter
+                    netviz-probe AnchorDesk reporter
 
 Future consumers    Server ingest endpoint · web UI latest-state view
                     websocket event streamer
@@ -201,7 +209,7 @@ Future consumers    Server ingest endpoint · web UI latest-state view
   parity
 - **v0.0.2** — visual polish, packaging, signed installers, screenshots
 - **v0.0.3** — history/diff UX and scan management
-- **v0.1.0** — `netviz-probe` headless scanner with MaterialTicket device push
+- **v0.1.0** — `netviz-probe` headless scanner with AnchorDesk device push
   and heartbeat reporting *(current)*
 - **v0.1.5** — single-tenant server ingest + Docker image at
   `ghcr.io/spillers-technology/netviz`

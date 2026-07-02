@@ -1,11 +1,11 @@
-// Package materialticket maps netviz scan results to the MaterialTicket probe
-// contract and pushes them to a MaterialTicket backend.
+// Package anchordesk maps netviz scan results to the AnchorDesk probe
+// contract and pushes them to an AnchorDesk backend.
 //
-// MaterialTicket owns the authoritative normalizer
+// AnchorDesk owns the authoritative normalizer
 // (backend/src/providers/NetVizProvider.ts). Keep DeviceRecord's JSON tags in
 // lockstep with that file; if field names change, either keep an alias there or
 // bump ContractVersion and update both sides in one change.
-package materialticket
+package anchordesk
 
 import (
 	"time"
@@ -14,11 +14,11 @@ import (
 )
 
 // ContractVersion is the wire contract netviz emits. It must match
-// NETVIZ_CONTRACT_VERSION on the MaterialTicket side.
+// NETVIZ_CONTRACT_VERSION on the AnchorDesk side.
 const ContractVersion = 1
 
-// DeviceRecord is one device in the MaterialTicket probe ingest contract (v1).
-// MaterialTicket tolerates several aliases on input; netviz emits the canonical
+// DeviceRecord is one device in the AnchorDesk probe ingest contract (v1).
+// AnchorDesk tolerates several aliases on input; netviz emits the canonical
 // field names below.
 type DeviceRecord struct {
 	ID         string    `json:"id"`
@@ -34,9 +34,9 @@ type DeviceRecord struct {
 	LastSeen   time.Time `json:"lastSeen"`
 }
 
-// ToDeviceRecord maps a netviz host observation onto the MaterialTicket wire
+// ToDeviceRecord maps a netviz host observation onto the AnchorDesk wire
 // shape. id prefers the MAC (the stablest per-device key) and falls back to the
-// IP, matching MaterialTicket's own id->mac->ip fallback.
+// IP, matching AnchorDesk's own id->mac->ip fallback.
 func ToDeviceRecord(h model.HostObservation) DeviceRecord {
 	id := h.MACAddress
 	if id == "" {

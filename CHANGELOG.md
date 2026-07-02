@@ -1,18 +1,58 @@
 # Changelog
 
+## v0.2.0 — 2026-07-02
+
+Added:
+
+- Desktop Probe tab for provisioning `netviz-probe` from the GUI. The tab uses
+  the current desktop CIDR, AnchorDesk URL/key, interval, and selected probe
+  binary to either install/start the persistent service or send one foreground
+  `-once` push.
+- GUI service controls for `netviz-probe status`, `start`, `stop`, `restart`,
+  and `uninstall`.
+- Probe binary auto-detection next to the desktop app, plus a file picker for
+  release layouts where the probe binary lives somewhere else.
+- Shared probe config file support through `netviz-probe -config`. GUI
+  provisioning writes the system-level config file, opens back to that existing
+  config, and installs the service as `run -config <path>` so repeated
+  provisioning converges on the same service definition.
+- Running probes re-read the config file before each scan cycle, so GUI edits
+  take effect without manually restarting the service.
+- Desktop Update tab and startup update check. The app checks GitHub Releases,
+  prompts only when an update is available, downloads the matching platform
+  archive on request, verifies the release `.sha256` checksum when present, and
+  stages the file in the user's NetViz update cache.
+- Shared `internal/version` package so the desktop updater and probe heartbeat
+  report the same release version.
+- Desktop visual contrast pass with stronger borders, darker secondary text,
+  clearer selected states, and more legible graph/hierarchy outlines.
+
+Notes:
+
+- The persistent GUI path stores the AnchorDesk URL/key in a service-readable
+  config file instead of service command-line arguments. Treat that host and
+  config file as credential-bearing infrastructure.
+- Service install/start/stop/uninstall still rely on the host OS service
+  manager and may require Administrator/root elevation.
+- Legacy services installed only with command-line/env configuration cannot be
+  fully reverse-engineered by the GUI; provisioning from the GUI migrates them
+  to the shared config-file service shape.
+- The updater stages verified release archives. Full in-place replacement of a
+  running desktop executable remains a future installer/helper step.
+
 ## v0.1.0 — 2026-06-19
 
-Adds the first `netviz-probe` headless scanner and its MaterialTicket
+Adds the first `netviz-probe` headless scanner and its AnchorDesk
 integration. A netviz instance deployed on a customer LAN can now act as a
-probe: it scans the network and pushes the devices it finds to a MaterialTicket
+probe: it scans the network and pushes the devices it finds to an AnchorDesk
 backend, which upserts them and links them to tickets.
 
 Added:
 
 - `netviz-probe` headless scanner binary built on the shared scanner core, with
   no desktop/Wails/UI dependencies.
-- `internal/materialticket` package: serializes host observations to the
-  MaterialTicket probe device contract (v1) and provides a transport-only client
+- `internal/anchordesk` package: serializes host observations to the
+  AnchorDesk probe device contract (v1) and provides a transport-only client
   for the probe ingest endpoints.
 - Device push: `POST /probe/devices` after each completed scan. Records are
   keyed for upsert (id falls back mac → ip), so re-scanning updates devices
@@ -20,7 +60,7 @@ Added:
 - Heartbeat: periodic `POST /probe/heartbeat` carrying the probe version and
   scanned CIDR.
 - Flag and environment configuration: `-cidr`, `-url`, `-key`, `-interval`, and
-  `-once`, with `NETVIZ_MATERIALTICKET_URL` / `NETVIZ_MATERIALTICKET_KEY` env
+  `-once`, with `NETVIZ_ANCHORDESK_URL` / `NETVIZ_ANCHORDESK_KEY` env
   fallbacks that keep the API key out of process listings and shell history.
 - Bounded-backoff retry that holds undelivered records for the next cycle
   instead of dropping them.
@@ -36,10 +76,10 @@ Added:
 
 Notes:
 
-- The probe authenticates to MaterialTicket with an API key issued once when an
+- The probe authenticates to AnchorDesk with an API key issued once when an
   admin registers the probe; it is sent as the `X-Probe-Key` header.
-- The wire contract is owned by MaterialTicket (`NETVIZ_CONTRACT_VERSION = 1`).
-  Keep `internal/materialticket` in lockstep with its normalizer, or bump the
+- The wire contract is owned by AnchorDesk (`NETVIZ_CONTRACT_VERSION = 1`).
+  Keep `internal/anchordesk` in lockstep with its normalizer, or bump the
   contract version on both sides together.
 - Standalone stdout JSON output and live per-device status streaming are not
   v0.1.0 features.

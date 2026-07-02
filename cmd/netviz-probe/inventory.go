@@ -3,7 +3,7 @@ package main
 import (
 	"sort"
 
-	"github.com/Spillers-Technology/netviz/internal/materialticket"
+	"github.com/Spillers-Technology/netviz/internal/anchordesk"
 	"github.com/Spillers-Technology/netviz/internal/model"
 )
 
@@ -11,18 +11,18 @@ import (
 // silent address in a CIDR. Once a real device has been observed, later silent
 // observations for its IP are reported as down while the probe remains running.
 type inventoryState struct {
-	byID   map[string]materialticket.DeviceRecord
+	byID   map[string]anchordesk.DeviceRecord
 	idByIP map[string]string
 }
 
-func (s *inventoryState) records(hosts []model.HostObservation) []materialticket.DeviceRecord {
+func (s *inventoryState) records(hosts []model.HostObservation) []anchordesk.DeviceRecord {
 	if s.byID == nil {
-		s.byID = make(map[string]materialticket.DeviceRecord)
+		s.byID = make(map[string]anchordesk.DeviceRecord)
 		s.idByIP = make(map[string]string)
 	}
 
 	activeIDs := make(map[string]struct{})
-	records := make(map[string]materialticket.DeviceRecord)
+	records := make(map[string]anchordesk.DeviceRecord)
 
 	// Record active/discovered devices first so an address change for the same
 	// MAC cannot be overwritten by a stale down observation later in the batch.
@@ -30,7 +30,7 @@ func (s *inventoryState) records(hosts []model.HostObservation) []materialticket
 		if !isDiscoveredHost(host) {
 			continue
 		}
-		record := materialticket.ToDeviceRecord(host)
+		record := anchordesk.ToDeviceRecord(host)
 		activeIDs[record.ID] = struct{}{}
 		records[record.ID] = record
 
@@ -70,7 +70,7 @@ func (s *inventoryState) records(hosts []model.HostObservation) []materialticket
 	}
 	sort.Strings(ids)
 
-	result := make([]materialticket.DeviceRecord, 0, len(ids))
+	result := make([]anchordesk.DeviceRecord, 0, len(ids))
 	for _, id := range ids {
 		result = append(result, records[id])
 	}

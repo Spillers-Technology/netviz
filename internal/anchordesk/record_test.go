@@ -1,4 +1,4 @@
-package materialticket
+package anchordesk
 
 import (
 	"encoding/json"
@@ -97,8 +97,8 @@ func TestToDeviceRecord(t *testing.T) {
 }
 
 // TestDeviceRecordWireShape locks the JSON field names and types to the
-// MaterialTicket v1 contract. Empty ports must marshal to [] (not null) so the
-// MaterialTicket normalizer parses them.
+// AnchorDesk v1 contract. Empty ports must marshal to [] (not null) so the
+// AnchorDesk normalizer parses them.
 func TestDeviceRecordWireShape(t *testing.T) {
 	rec := ToDeviceRecord(model.HostObservation{
 		IP:         "192.168.1.20",

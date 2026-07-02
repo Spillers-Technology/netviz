@@ -39,9 +39,9 @@ longer accurate. v0.0.1 now includes:
 - Desktop may depend on scanner core.
 - Server must not depend on Wails.
 - Probe must not depend on Wails or desktop code.
-- The MaterialTicket integration lives in `internal/materialticket` and depends
+- The AnchorDesk integration lives in `internal/anchordesk` and depends
   only on `internal/model`. The probe may depend on the scanner core and
-  `internal/materialticket`.
+  `internal/anchordesk`.
 - Scanner events are the primary integration surface.
 - Keep scanner configuration constrained and explicit. Validate CIDR input. Do
   not add arbitrary scanner flags.
@@ -56,7 +56,7 @@ longer accurate. v0.0.1 now includes:
   cleanup.
 - v0.0.3: history/diff UX and scan management.
 - v0.1.0: `netviz-probe` always-on LAN probe that pushes device inventory to a
-  MaterialTicket backend with heartbeat reporting, installable as a Windows
+  AnchorDesk backend with heartbeat reporting, installable as a Windows
   service, systemd unit, or launchd job. Released June 19, 2026.
 - v0.1.x: desktop probe management — GUI installs/manages the headless probe
   service and edits its shared config file; the service, not the GUI, runs the
