@@ -184,7 +184,8 @@ Goal: make the desktop GUI the control surface for the headless probe service �
 deploy it and edit its config — without the GUI ever running the report loop
 itself. The service stays the durable runner; the GUI is a front-end.
 
-Status: first slice in progress. The desktop Probe tab can locate the probe
+Status: shipped as v0.2.0 on July 2, 2026, together with the desktop update
+tab and a first visual contrast pass. The desktop Probe tab can locate the probe
 binary, collect AnchorDesk URL/key/interval, use the current desktop CIDR,
 install/start the persistent service, run a foreground `-once` push, and manage
 start/stop/restart/uninstall/status. GUI-managed probes use a shared
@@ -225,9 +226,11 @@ Acceptance criteria:
 - Config edited in the GUI is picked up by the running service without a manual
   restart.
 
-## v0.1.5: Server Ingest and Docker Web UI
+## v0.3.0: Server Ingest and Docker Web UI
 
 Goal: add single-tenant server ingest and a useful containerized web UI.
+(Renumbered from the original v0.1.5 milestone; v0.2.0 shipped desktop probe
+management first.)
 
 Features:
 
@@ -239,9 +242,7 @@ Features:
 
 Non-goals:
 
-- Multi-tenancy.
-- Probe enrollment.
-- Per-tenant tokens.
+- Multi-tenancy (dropped from the roadmap — see below).
 
 Acceptance criteria:
 
@@ -249,44 +250,34 @@ Acceptance criteria:
 - Server accepts probe observations.
 - Latest network state renders in the web UI.
 
-## v0.1.9: Multi-Tenant Hosted/Server Mode
+## Dropped: Multi-Tenant Hosted Mode (was v0.1.9)
 
-Goal: prepare server mode for hosted or shared deployments.
+Multi-tenancy, probe enrollment, and per-tenant tokens are removed from the
+NetViz roadmap. AnchorDesk owns tenancy: each probe is registered to one
+company and pushes to that company's AnchorDesk backend with its own API key,
+so syncing users get tenancy for free externally. A local-only NetViz server
+is single-site by definition and would gain nothing but complexity.
 
-Features:
-
-- Multi-tenancy.
-- Probe enrollment.
-- Per-tenant tokens.
-- Public URL deployment model.
-- Probe phone-home architecture.
-- Historical diff dashboard.
-
-Non-goals:
-
-- RMM features.
-- Remote shell or command execution.
-- Credential collection.
-
-Acceptance criteria:
-
-- Tenant isolation is tested.
-- Probe authentication is documented.
-- Hosted deployment guide exists.
-
-## v0.2.0: Polish and Hardening
+## v0.4.0: Polish and Hardening
 
 Goal: make NetViz reliable and pleasant enough for broader FOSS use.
 
 Features:
 
-- Packaging improvements.
+- Packaging improvements: Windows installer/code signing and macOS
+  notarization so releases install without SmartScreen/Gatekeeper friction.
+- Finish the updater: in-place replacement of the running desktop executable
+  (v0.2.0 stages verified archives but does not install them).
 - Better error states.
 - Performance tuning for common LAN sizes.
-- Accessibility pass.
+- UX and visibility pass: validated color palette, keyboard focus states,
+  legends for the visual views, and contrast checks run as part of review.
+- More robust vendor enrichment (bundled OUI database rather than ARP-cache
+  vendor lookup alone).
+- Per-device history in the detail panel backed by local scan history, with a
+  retention cutoff so monitor mode cannot grow the database without bound.
 - Documentation examples.
 - Release checklist.
-- More robust vendor enrichment strategy.
 
 Non-goals:
 
@@ -298,3 +289,34 @@ Acceptance criteria:
 - Release artifacts are reproducible.
 - Common install paths are documented.
 - UI remains responsive during expected scans.
+
+## v1.0.0: Stability Freeze
+
+Goal: commit to the compatibility guarantees that make NetViz safe to depend
+on. Mostly declarations plus the tests and migrations that back them.
+
+Features:
+
+- AnchorDesk probe contract v1 frozen and documented; any change bumps the
+  contract version on both sides together.
+- Versioned formats with migration or an explicit compatibility statement:
+  scan-data files, CSV export, probe config file, and the SQLite history
+  schema.
+- Documented semver policy: CLI flags, file formats, wire contract, and config
+  are covered; internal Go packages are not.
+- Security posture doc: probe threat model (API key on customer LANs, runs as
+  SYSTEM/root), key rotation guidance, and a security review of the server
+  ingest surface.
+- Complete install and deployment docs for desktop, probe, and server on all
+  supported platforms, with current screenshots.
+
+Acceptance criteria:
+
+- A tech can install a signed desktop app, deploy a probe to a customer site
+  from the GUI, point it at a self-hosted Docker server or AnchorDesk, and
+  later upgrade all three components without losing history or breaking the
+  wire contract.
+- `go test ./...`, `go vet ./...`, and frontend builds pass on all release
+  platforms.
+- Upgrading from the previous release preserves local history and probe
+  config.
