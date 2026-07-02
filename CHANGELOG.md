@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.9.3 — 2026-07-02
+
+Documentation sync for the v0.9 series.
+
+Changed:
+
+- PROBE_DEPLOYMENT.md now documents both probe backends explicitly: an
+  AnchorDesk instance or a self-hosted `netviz-server`, same wire contract,
+  differing only in URL and key.
+- README and the GitHub Pages site mark the v0.9.x series (SSO, stability
+  freeze, self-contained updates, console-flash fix) as current, with
+  v1.0.0 gated on signed/notarized builds.
+
 ## v0.9.2 — 2026-07-02
 
 Fixed:

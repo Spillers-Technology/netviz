@@ -249,8 +249,8 @@ Future consumers    websocket event streamer
   image at `ghcr.io/spillers-technology/netviz`
 - **v0.4.0** — vendor enrichment (IEEE OUI), per-device history, updater
   in-place install, emoji device icons
-- **v0.9.0** — server sign-in with OIDC SSO; stability-freeze docs
-  *(current)*
+- **v0.9.x** — server sign-in with OIDC SSO, stability-freeze docs,
+  self-contained updates, and desktop UX fixes *(current)*
 - **v1.0.0** — signed/notarized binaries on the frozen v0.9 feature set
 
 See [MILESTONES.md](MILESTONES.md) for acceptance criteria,
