@@ -1,8 +1,14 @@
 # Deploying the NetViz Probe
 
 `netviz-probe` is the unattended NetViz scanner. It runs natively on a customer
-LAN, scans one IPv4 CIDR on an interval, pushes inventory to AnchorDesk, and
+LAN, scans one IPv4 CIDR on an interval, pushes inventory to its backend, and
 sends heartbeat reports between scans.
+
+The probe speaks one wire contract to two interchangeable backends: an
+AnchorDesk instance, or a self-hosted `netviz-server` (Docker image at
+`ghcr.io/spillers-technology/netviz` — see the README's Server mode section).
+Everything in this guide applies to both; only the URL and key differ. For a
+netviz-server backend the key is the server's `NETVIZ_INGEST_KEY`.
 
 Only scan networks you own or are authorized to assess.
 
@@ -11,7 +17,8 @@ Only scan networks you own or are authorized to assess.
 1. Download the release archive for the host OS and architecture.
 2. Move `netviz-probe` to a permanent location. The service registration uses
    the binary's current absolute path.
-3. Obtain the AnchorDesk base URL and probe API key.
+3. Obtain the backend base URL and probe API key (AnchorDesk-issued, or the
+   netviz-server ingest key).
 4. Choose the directly connected IPv4 CIDR to scan, such as
    `192.168.1.0/24`.
 5. Run a foreground smoke test:
