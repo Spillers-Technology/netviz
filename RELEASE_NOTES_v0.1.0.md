@@ -1,15 +1,15 @@
 # NetViz v0.1.0
 
 NetViz v0.1.0 turns the scanner core into an unattended LAN probe for
-MaterialTicket. A technician can place one native binary on a customer network,
+AnchorDesk. A technician can place one native binary on a customer network,
 register it with the host operating system, and continuously feed device
-inventory and liveness into MaterialTicket.
+inventory and liveness into AnchorDesk.
 
 ## Highlights
 
 - New `netviz-probe` headless binary with no desktop or Wails dependency.
 - Continuous CIDR scanning and `-once` smoke-test mode.
-- MaterialTicket device ingest through `POST /probe/devices`.
+- AnchorDesk device ingest through `POST /probe/devices`.
 - Probe heartbeat reporting through `POST /probe/heartbeat`.
 - Stable device upserts keyed by MAC address with IP fallback.
 - Silent, never-discovered CIDR addresses are not manufactured as devices;
@@ -31,7 +31,7 @@ netviz-probe stop
 netviz-probe uninstall
 ```
 
-Set `NETVIZ_MATERIALTICKET_URL` and `NETVIZ_MATERIALTICKET_KEY` before
+Set `NETVIZ_ANCHORDESK_URL` and `NETVIZ_ANCHORDESK_KEY` before
 installation so the key is not placed in the registered command line. Service
 installation and removal require Administrator/root privileges.
 
@@ -41,7 +41,7 @@ for platform-specific commands.
 
 ## Contract validation
 
-The v1 wire contract was tested against a running MaterialTicket backend:
+The v1 wire contract was tested against a running AnchorDesk backend:
 
 - first scan: 1 device created
 - second scan: 1 device updated

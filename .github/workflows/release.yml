@@ -70,7 +70,7 @@ jobs:
           else
             cp -R desktop/build/bin/. "dist/netviz/desktop/"
           fi
-          cp README.md LICENSE CHANGELOG.md MILESTONES.md PROBE_DEPLOYMENT.md RELEASE_NOTES_v0.1.0.md "dist/netviz/"
+          cp README.md LICENSE CHANGELOG.md MILESTONES.md PROBE_DEPLOYMENT.md RELEASE_NOTES_v0.1.0.md RELEASE_NOTES_v0.2.0.md "dist/netviz/"
           tar -C dist -czf "${{ steps.meta.outputs.asset }}" netviz
           shasum -a 256 "${{ steps.meta.outputs.asset }}" > "${{ steps.meta.outputs.asset }}.sha256"
       - name: Upload release asset
@@ -176,7 +176,7 @@ jobs:
           New-Item -ItemType Directory -Force dist/netviz/desktop | Out-Null
           Copy-Item dist/bin/* dist/netviz/bin/ -Recurse -Force
           Copy-Item desktop/build/bin/* dist/netviz/desktop/ -Recurse -Force
-          Copy-Item README.md,LICENSE,CHANGELOG.md,MILESTONES.md,PROBE_DEPLOYMENT.md,RELEASE_NOTES_v0.1.0.md dist/netviz/ -Force
+          Copy-Item README.md,LICENSE,CHANGELOG.md,MILESTONES.md,PROBE_DEPLOYMENT.md,RELEASE_NOTES_v0.1.0.md,RELEASE_NOTES_v0.2.0.md dist/netviz/ -Force
           Compress-Archive -Path dist/netviz -DestinationPath "${{ steps.meta.outputs.asset }}" -Force
           $hash = Get-FileHash "${{ steps.meta.outputs.asset }}" -Algorithm SHA256
           "$($hash.Hash.ToLowerInvariant())  ${{ steps.meta.outputs.asset }}" | Out-File "${{ steps.meta.outputs.asset }}.sha256" -Encoding ascii

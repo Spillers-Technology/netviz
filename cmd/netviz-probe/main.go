@@ -1,6 +1,6 @@
-// Command netviz-probe scans a LAN and pushes device records to a MaterialTicket
+// Command netviz-probe scans a LAN and pushes device records to an AnchorDesk
 // backend. It runs the netviz scanner core, serializes results to the
-// MaterialTicket probe contract, and POSTs them to /probe/devices while keeping
+// AnchorDesk probe contract, and POSTs them to /probe/devices while keeping
 // the probe marked online via periodic /probe/heartbeat.
 package main
 
@@ -14,14 +14,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Spillers-Technology/netviz/internal/materialticket"
+	"github.com/Spillers-Technology/netviz/internal/anchordesk"
 	"github.com/Spillers-Technology/netviz/internal/model"
 	"github.com/Spillers-Technology/netviz/internal/scanner"
+	"github.com/Spillers-Technology/netviz/internal/version"
 	"github.com/kardianos/service"
 )
 
-// Version is reported in heartbeats to MaterialTicket.
-const Version = "0.1.0"
+// Version is reported in heartbeats to AnchorDesk.
+const Version = version.Version
 
 const (
 	retryBaseDelay = 5 * time.Second
@@ -97,19 +98,24 @@ func runConfigured(cfg probeConfig) error {
 }
 
 func runProbe(ctx context.Context, cfg probeConfig, logf func(string, ...any)) error {
-	client := materialticket.NewClient(cfg.url, cfg.key, Version)
-
 	// pending holds records from a scan whose push failed, so we retry on the
 	// next cycle instead of dropping them.
 	var delivery deliveryState
 	var inventory inventoryState
 
-	if !cfg.once {
-		go heartbeatLoop(ctx, client, cfg.cidr, cfg.interval, logf)
-	}
+	scanAndPush := func(active probeConfig) error {
+		client := anchordesk.NewClient(active.url, active.key, Version)
+		if !active.once {
+			if err := client.Heartbeat(ctx, "online", active.cidr); err != nil {
+				if ctx.Err() == nil {
+					logf("heartbeat failed: %v", err)
+				}
+			} else {
+				logf("heartbeat sent: status=online cidr=%s version=%s", active.cidr, Version)
+			}
+		}
 
-	scanAndPush := func() error {
-		hosts, err := scan(ctx, cfg.cidr)
+		hosts, err := scan(ctx, active.cidr)
 		if err != nil {
 			return fmt.Errorf("scan failed: %w", err)
 		}
@@ -129,7 +135,11 @@ func runProbe(ctx context.Context, cfg probeConfig, logf func(string, ...any)) e
 		return nil
 	}
 
-	err := scanAndPush()
+	active, err := cfg.reload()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	err = scanAndPush(active)
 	if cfg.once {
 		return err
 	}
@@ -138,7 +148,7 @@ func runProbe(ctx context.Context, cfg probeConfig, logf func(string, ...any)) e
 	}
 
 	for {
-		wait := cfg.interval
+		wait := active.interval
 		if delivery.backoff > 0 && delivery.backoff < wait {
 			wait = delivery.backoff
 		}
@@ -146,7 +156,15 @@ func runProbe(ctx context.Context, cfg probeConfig, logf func(string, ...any)) e
 		case <-ctx.Done():
 			return nil
 		case <-time.After(wait):
-			if err := scanAndPush(); err != nil && ctx.Err() == nil {
+			next, err := cfg.reload()
+			if err != nil {
+				if ctx.Err() == nil {
+					logf("load config: %v", err)
+				}
+				continue
+			}
+			active = next
+			if err := scanAndPush(active); err != nil && ctx.Err() == nil {
 				logf("%v", err)
 			}
 		}
@@ -179,7 +197,7 @@ func scan(ctx context.Context, cidr string) ([]model.HostObservation, error) {
 }
 
 // heartbeatLoop reports liveness on a fixed interval until the context is done.
-func heartbeatLoop(ctx context.Context, client *materialticket.Client, cidr string, interval time.Duration, logf func(string, ...any)) {
+func heartbeatLoop(ctx context.Context, client *anchordesk.Client, cidr string, interval time.Duration, logf func(string, ...any)) {
 	send := func() {
 		if err := client.Heartbeat(ctx, "online", cidr); err != nil {
 			if ctx.Err() == nil {
@@ -203,21 +221,21 @@ func heartbeatLoop(ctx context.Context, client *materialticket.Client, cidr stri
 }
 
 type deviceSender interface {
-	SendDevices(context.Context, []materialticket.DeviceRecord) (materialticket.IngestResult, error)
+	SendDevices(context.Context, []anchordesk.DeviceRecord) (anchordesk.IngestResult, error)
 }
 
 type deliveryState struct {
-	pending []materialticket.DeviceRecord
+	pending []anchordesk.DeviceRecord
 	backoff time.Duration
 }
 
-func (d *deliveryState) send(ctx context.Context, sender deviceSender, fresh []materialticket.DeviceRecord) (materialticket.IngestResult, int, error) {
+func (d *deliveryState) send(ctx context.Context, sender deviceSender, fresh []anchordesk.DeviceRecord) (anchordesk.IngestResult, int, error) {
 	records := mergeRecords(d.pending, fresh)
 	result, err := sender.SendDevices(ctx, records)
 	if err != nil {
 		d.pending = records
 		d.backoff = nextBackoff(d.backoff)
-		return materialticket.IngestResult{}, len(records), err
+		return anchordesk.IngestResult{}, len(records), err
 	}
 	d.pending = nil
 	d.backoff = 0
@@ -226,13 +244,13 @@ func (d *deliveryState) send(ctx context.Context, sender deviceSender, fresh []m
 
 // mergeRecords overlays fresh records on top of held-over ones, keyed by record
 // ID, so a re-scan refreshes a device rather than duplicating it.
-func mergeRecords(held, fresh []materialticket.DeviceRecord) []materialticket.DeviceRecord {
+func mergeRecords(held, fresh []anchordesk.DeviceRecord) []anchordesk.DeviceRecord {
 	if len(held) == 0 {
 		return fresh
 	}
-	byID := make(map[string]materialticket.DeviceRecord, len(held)+len(fresh))
+	byID := make(map[string]anchordesk.DeviceRecord, len(held)+len(fresh))
 	order := make([]string, 0, len(held)+len(fresh))
-	add := func(r materialticket.DeviceRecord) {
+	add := func(r anchordesk.DeviceRecord) {
 		if _, ok := byID[r.ID]; !ok {
 			order = append(order, r.ID)
 		}
@@ -244,7 +262,7 @@ func mergeRecords(held, fresh []materialticket.DeviceRecord) []materialticket.De
 	for _, r := range fresh {
 		add(r)
 	}
-	merged := make([]materialticket.DeviceRecord, 0, len(order))
+	merged := make([]anchordesk.DeviceRecord, 0, len(order))
 	for _, id := range order {
 		merged = append(merged, byID[id])
 	}

@@ -1,4 +1,4 @@
-package materialticket
+package anchordesk
 
 import (
 	"bytes"
@@ -16,7 +16,7 @@ const (
 	maxErrorBodyLen = 512
 )
 
-// Client is a transport-only client for the MaterialTicket probe endpoints. It
+// Client is a transport-only client for the AnchorDesk probe endpoints. It
 // performs no retry or backoff of its own; callers own retry policy so they can
 // decide what to do with unsent records.
 type Client struct {
@@ -38,7 +38,7 @@ func WithHTTPClient(hc *http.Client) Option {
 	}
 }
 
-// NewClient builds a MaterialTicket probe client. baseURL is the backend root
+// NewClient builds an AnchorDesk probe client. baseURL is the backend root
 // (e.g. https://rmm.spillerstech.us); apiKey is the probe key sent as
 // X-Probe-Key; version is reported in heartbeats.
 func NewClient(baseURL, apiKey, version string, opts ...Option) *Client {

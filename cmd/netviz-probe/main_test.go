@@ -6,21 +6,23 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/Spillers-Technology/netviz/internal/materialticket"
+	"github.com/Spillers-Technology/netviz/internal/anchordesk"
+	"github.com/Spillers-Technology/netviz/internal/probeconfig"
 )
 
 type fakeSender struct {
-	calls     [][]materialticket.DeviceRecord
-	responses []materialticket.IngestResult
+	calls     [][]anchordesk.DeviceRecord
+	responses []anchordesk.IngestResult
 	errors    []error
 }
 
-func (f *fakeSender) SendDevices(_ context.Context, records []materialticket.DeviceRecord) (materialticket.IngestResult, error) {
-	copied := append([]materialticket.DeviceRecord(nil), records...)
+func (f *fakeSender) SendDevices(_ context.Context, records []anchordesk.DeviceRecord) (anchordesk.IngestResult, error) {
+	copied := append([]anchordesk.DeviceRecord(nil), records...)
 	f.calls = append(f.calls, copied)
 	index := len(f.calls) - 1
 	return f.responses[index], f.errors[index]
@@ -30,7 +32,7 @@ func TestDeliveryRetriesHeldRecordsAndResetsBackoff(t *testing.T) {
 	t.Parallel()
 
 	sender := &fakeSender{
-		responses: []materialticket.IngestResult{
+		responses: []anchordesk.IngestResult{
 			{},
 			{Received: 2, Created: 1, Updated: 1},
 		},
@@ -41,7 +43,7 @@ func TestDeliveryRetriesHeldRecordsAndResetsBackoff(t *testing.T) {
 	}
 	state := &deliveryState{}
 
-	_, sent, err := state.send(context.Background(), sender, []materialticket.DeviceRecord{
+	_, sent, err := state.send(context.Background(), sender, []anchordesk.DeviceRecord{
 		{ID: "device-a", Hostname: "old-name"},
 	})
 	if err == nil {
@@ -54,7 +56,7 @@ func TestDeliveryRetriesHeldRecordsAndResetsBackoff(t *testing.T) {
 		t.Errorf("backoff = %s, want %s", state.backoff, retryBaseDelay)
 	}
 
-	result, sent, err := state.send(context.Background(), sender, []materialticket.DeviceRecord{
+	result, sent, err := state.send(context.Background(), sender, []anchordesk.DeviceRecord{
 		{ID: "device-a", Hostname: "new-name"},
 		{ID: "device-b"},
 	})
@@ -111,6 +113,23 @@ func TestServiceDefinitionKeepsSecretOutOfArguments(t *testing.T) {
 	}
 }
 
+func TestServiceDefinitionCanUseConfigFile(t *testing.T) {
+	t.Parallel()
+
+	cfg := probeConfig{
+		config: filepath.Join("C:", "ProgramData", "NetViz", "probe.json"),
+	}
+	definition := serviceDefinition(cfg)
+	arguments := strings.Join(definition.Arguments, " ")
+
+	if !strings.Contains(arguments, "run") || !strings.Contains(arguments, "-config="+cfg.config) {
+		t.Fatalf("service arguments = %q, want run -config", arguments)
+	}
+	if definition.EnvVars != nil {
+		t.Fatalf("service env vars = %#v, want none when using config file", definition.EnvVars)
+	}
+}
+
 func TestParseProbeConfigUsesEnvironment(t *testing.T) {
 	t.Setenv(envURL, "https://rmm.example.com")
 	t.Setenv(envKey, "probe-key")
@@ -121,6 +140,29 @@ func TestParseProbeConfigUsesEnvironment(t *testing.T) {
 	}
 	if cfg.url != "https://rmm.example.com" || cfg.key != "probe-key" {
 		t.Errorf("environment config = %#v", cfg)
+	}
+	if cfg.interval != 2*time.Minute {
+		t.Errorf("interval = %s, want 2m", cfg.interval)
+	}
+}
+
+func TestParseProbeConfigUsesConfigFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "probe.json")
+	if err := probeconfig.Save(path, probeconfig.Config{
+		CIDR:          "10.20.30.0/24",
+		AnchorDeskURL: "https://rmm.example.com",
+		ProbeKey:      "probe-key",
+		Interval:      "2m",
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	cfg, err := parseProbeConfig("run", []string{"-config", path})
+	if err != nil {
+		t.Fatalf("parseProbeConfig: %v", err)
+	}
+	if cfg.cidr != "10.20.30.0/24" || cfg.url != "https://rmm.example.com" || cfg.key != "probe-key" {
+		t.Errorf("config file values = %#v", cfg)
 	}
 	if cfg.interval != 2*time.Minute {
 		t.Errorf("interval = %s, want 2m", cfg.interval)
@@ -167,7 +209,7 @@ func TestHeartbeatLoopLogsSuccessfulReport(t *testing.T) {
 	logged := make(chan string, 1)
 	go heartbeatLoop(
 		ctx,
-		materialticket.NewClient(server.URL, "probe-key", Version),
+		anchordesk.NewClient(server.URL, "probe-key", Version),
 		"10.0.0.0/24",
 		time.Hour,
 		func(format string, args ...any) {

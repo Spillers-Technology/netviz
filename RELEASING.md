@@ -53,6 +53,11 @@ Each archive contains:
 - desktop build output for that platform
 - README, LICENSE, changelog, probe deployment guide, and milestone notes
 
+The desktop updater depends on those asset names and matching `.sha256` files.
+Before publishing a release, confirm the release includes the platform archive
+for each supported runner and that the checksum file contains the SHA-256 digest
+for that exact archive.
+
 The workflow also supports manual dispatch with a `tag` input to rebuild assets
 for an existing release.
 
@@ -65,7 +70,7 @@ for an existing release.
 - `wails build` on available desktop platforms
 - Build `netviz-probe` for Windows, Linux, and macOS
 - Install/start/status/stop/uninstall the probe on each release platform
-- Run the probe twice against MaterialTicket and confirm the first ingest
+- Run the probe twice against AnchorDesk and confirm the first ingest
   creates devices while the second updates the same devices without duplicates
 - Confirm a bad probe key produces a useful non-2xx error
 - Confirm platform service logs contain push and heartbeat results
@@ -73,3 +78,5 @@ for an existing release.
 - Confirm [CHANGELOG.md](CHANGELOG.md) has the v0.1.0 notes
 - Confirm [PROBE_DEPLOYMENT.md](PROBE_DEPLOYMENT.md) matches the shipped
   service commands
+- Confirm the desktop Update tab detects the release, selects the current
+  platform asset, downloads it, and verifies the `.sha256` checksum

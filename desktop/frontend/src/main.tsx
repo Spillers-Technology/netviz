@@ -48,6 +48,49 @@ type ScanDiff = {
   changed_hosts?: HostChange[];
 };
 
+type ProbeServiceStatus = {
+  probe_path: string;
+  config_path: string;
+  config?: ProbeConfigState;
+  found: boolean;
+  state: string;
+  severity: string;
+  summary: string;
+  message: string;
+  output: string;
+};
+
+type ProbeConfigState = {
+  cidr: string;
+  anchordesk_url: string;
+  probe_key: string;
+  interval: string;
+  config_path: string;
+};
+
+type ProbeSetupRequest = {
+  cidr: string;
+  anchordesk_url: string;
+  probe_key: string;
+  interval: string;
+  probe_path: string;
+  install_persistent: boolean;
+  start_after_install: boolean;
+};
+
+type UpdateInfo = {
+  current_version: string;
+  latest_version: string;
+  available: boolean;
+  release_url: string;
+  asset_name: string;
+  asset_url: string;
+  checksum_name: string;
+  checksum_url: string;
+  download_path: string;
+  message: string;
+};
+
 type ScanEvent = {
   type: string;
   ip?: string;
@@ -56,7 +99,7 @@ type ScanEvent = {
   total_hosts?: number;
 };
 
-type Tab = "table" | "graph" | "hierarchy" | "history";
+type Tab = "table" | "graph" | "hierarchy" | "history" | "probe" | "update";
 type DeviceState = "new" | "online" | "offline" | "changed" | "stable";
 
 declare global {
@@ -72,6 +115,13 @@ declare global {
           SaveCSVFile(): Promise<void>;
           ListHistory(): Promise<ScanRun[]>;
           LatestDiff(): Promise<ScanDiff>;
+          ChooseProbeBinary(): Promise<string>;
+          GetProbeStatus(probePath: string): Promise<ProbeServiceStatus>;
+          ProvisionProbe(request: ProbeSetupRequest): Promise<ProbeServiceStatus>;
+          ProbeServiceAction(action: string, probePath: string): Promise<ProbeServiceStatus>;
+          CheckForUpdate(): Promise<UpdateInfo>;
+          DownloadLatestUpdate(): Promise<UpdateInfo>;
+          OpenUpdateDownload(path: string): Promise<void>;
         };
       };
     };
@@ -95,6 +145,36 @@ function App() {
   const [checkedHosts, setCheckedHosts] = useState(0);
   const [totalHosts, setTotalHosts] = useState(0);
   const [error, setError] = useState("");
+  const [probeURL, setProbeURL] = useState("");
+  const [probeKey, setProbeKey] = useState("");
+  const [probeInterval, setProbeInterval] = useState("1m");
+  const [probePath, setProbePath] = useState("");
+  const [installPersistent, setInstallPersistent] = useState(true);
+  const [startAfterInstall, setStartAfterInstall] = useState(true);
+  const [probeBusy, setProbeBusy] = useState(false);
+  const [updateBusy, setUpdateBusy] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo>({
+    current_version: "",
+    latest_version: "",
+    available: false,
+    release_url: "",
+    asset_name: "",
+    asset_url: "",
+    checksum_name: "",
+    checksum_url: "",
+    download_path: "",
+    message: "",
+  });
+  const [probeStatus, setProbeStatus] = useState<ProbeServiceStatus>({
+    probe_path: "",
+    config_path: "",
+    found: false,
+    state: "unknown",
+    severity: "info",
+    summary: "",
+    message: "",
+    output: "",
+  });
   const monitoringRef = useRef(false);
   const scanningRef = useRef(false);
   const cidrRef = useRef(cidr);
@@ -113,6 +193,8 @@ function App() {
 
   useEffect(() => {
     refreshHistory();
+    refreshProbeStatus();
+    checkForUpdates(false);
     const offEvent = window.runtime?.EventsOn("scan:event", (payload) => {
       const event = payload as ScanEvent;
       if (event.host) {
@@ -184,6 +266,43 @@ function App() {
       setDiff(latestDiff || { base_run_id: "", compare_run_id: "" });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function refreshProbeStatus(path = probePath) {
+    const app = window.go?.main?.App;
+    if (!app) return;
+    try {
+      const status = await app.GetProbeStatus(path);
+      setProbeStatus(status);
+      if (!probePath && status.probe_path) {
+        setProbePath(status.probe_path);
+      }
+      if (status.config) {
+        setCidr(status.config.cidr);
+        setProbeURL(status.config.anchordesk_url);
+        setProbeKey(status.config.probe_key);
+        setProbeInterval(status.config.interval || "1m");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function checkForUpdates(showErrors = true) {
+    const app = window.go?.main?.App;
+    if (!app) return;
+    setUpdateBusy(true);
+    if (showErrors) setError("");
+    try {
+      const info = await app.CheckForUpdate();
+      setUpdateInfo(info);
+    } catch (err) {
+      if (showErrors) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setUpdateBusy(false);
     }
   }
 
@@ -293,6 +412,90 @@ function App() {
     }
   }
 
+  async function chooseProbeBinary() {
+    const app = window.go?.main?.App;
+    if (!app) return;
+    setError("");
+    try {
+      const chosen = await app.ChooseProbeBinary();
+      if (!chosen) return;
+      setProbePath(chosen);
+      await refreshProbeStatus(chosen);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function provisionProbe() {
+    const app = window.go?.main?.App;
+    if (!app) return;
+    setError("");
+    setProbeBusy(true);
+    try {
+      const status = await app.ProvisionProbe({
+        cidr,
+        anchordesk_url: probeURL,
+        probe_key: probeKey,
+        interval: probeInterval,
+        probe_path: probePath,
+        install_persistent: installPersistent,
+        start_after_install: startAfterInstall,
+      });
+      setProbeStatus(status);
+      if (status.probe_path) {
+        setProbePath(status.probe_path);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProbeBusy(false);
+    }
+  }
+
+  async function probeAction(action: string) {
+    const app = window.go?.main?.App;
+    if (!app) return;
+    setError("");
+    setProbeBusy(true);
+    try {
+      const status = await app.ProbeServiceAction(action, probePath);
+      setProbeStatus(status);
+      if (status.probe_path) {
+        setProbePath(status.probe_path);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProbeBusy(false);
+    }
+  }
+
+  async function downloadUpdate() {
+    const app = window.go?.main?.App;
+    if (!app) return;
+    setError("");
+    setUpdateBusy(true);
+    try {
+      const info = await app.DownloadLatestUpdate();
+      setUpdateInfo(info);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUpdateBusy(false);
+    }
+  }
+
+  async function openUpdateDownload() {
+    const app = window.go?.main?.App;
+    if (!app || !updateInfo.download_path) return;
+    setError("");
+    try {
+      await app.OpenUpdateDownload(updateInfo.download_path);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return (
     <main className="shell">
       <section className="toolbar" aria-label="Scan controls">
@@ -336,6 +539,13 @@ function App() {
         {monitoring && <span>monitoring every 15s</span>}
       </section>
 
+      {updateInfo.available && tab !== "update" && (
+        <section className="updateBanner" aria-label="Update available">
+          <span>{updateInfo.message}</span>
+          <button onClick={() => setTab("update")}>Review Update</button>
+        </section>
+      )}
+
       <nav className="tabs" aria-label="Views">
         <button className={tab === "table" ? "active" : ""} onClick={() => setTab("table")}>
           Table
@@ -349,6 +559,12 @@ function App() {
         <button className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}>
           History
         </button>
+        <button className={tab === "probe" ? "active" : ""} onClick={() => setTab("probe")}>
+          Probe
+        </button>
+        <button className={tab === "update" ? "active" : ""} onClick={() => setTab("update")}>
+          Update
+        </button>
       </nav>
 
       {error && <div className="error">{error}</div>}
@@ -357,8 +573,255 @@ function App() {
       {tab === "graph" && <GraphView hosts={visibleRows} states={deviceStates} />}
       {tab === "hierarchy" && <HierarchyView hosts={visibleRows} states={deviceStates} />}
       {tab === "history" && <HistoryView history={history} diff={diff} onRefresh={refreshHistory} />}
+      {tab === "probe" && (
+        <ProbeView
+          cidr={cidr}
+          url={probeURL}
+          setURL={setProbeURL}
+          keyValue={probeKey}
+          setKey={setProbeKey}
+          interval={probeInterval}
+          setInterval={setProbeInterval}
+          probePath={probePath}
+          setProbePath={setProbePath}
+          installPersistent={installPersistent}
+          setInstallPersistent={setInstallPersistent}
+          startAfterInstall={startAfterInstall}
+          setStartAfterInstall={setStartAfterInstall}
+          status={probeStatus}
+          busy={probeBusy}
+          onChooseBinary={chooseProbeBinary}
+          onProvision={provisionProbe}
+          onRefresh={() => refreshProbeStatus()}
+          onAction={probeAction}
+        />
+      )}
+      {tab === "update" && (
+        <UpdateView
+          info={updateInfo}
+          busy={updateBusy}
+          onCheck={() => checkForUpdates(true)}
+          onDownload={downloadUpdate}
+          onOpenDownload={openUpdateDownload}
+        />
+      )}
     </main>
   );
+}
+
+function UpdateView({
+  info,
+  busy,
+  onCheck,
+  onDownload,
+  onOpenDownload,
+}: {
+  info: UpdateInfo;
+  busy: boolean;
+  onCheck: () => void;
+  onDownload: () => void;
+  onOpenDownload: () => void;
+}) {
+  return (
+    <section className="updateWrap" aria-label="Application update">
+      <div className="updateHeader">
+        <div>
+          <h2>Update</h2>
+          <p className="quiet">{info.message || "Check GitHub Releases for a newer NetViz build."}</p>
+        </div>
+        <button onClick={onCheck} disabled={busy}>Check</button>
+      </div>
+
+      <div className="updateGrid">
+        <section className="updatePanel">
+          <h3>Version</h3>
+          <dl className="updateDetails">
+            <div>
+              <dt>Installed</dt>
+              <dd>{info.current_version || "unknown"}</dd>
+            </div>
+            <div>
+              <dt>Latest</dt>
+              <dd>{info.latest_version || "unknown"}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{info.available ? "update available" : info.message || "not checked"}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="updatePanel">
+          <h3>Release Asset</h3>
+          <dl className="updateDetails">
+            <div>
+              <dt>Asset</dt>
+              <dd>{info.asset_name || "none selected"}</dd>
+            </div>
+            <div>
+              <dt>Checksum</dt>
+              <dd>{info.checksum_name || "not available"}</dd>
+            </div>
+            <div>
+              <dt>Downloaded</dt>
+              <dd>{info.download_path || "not downloaded"}</dd>
+            </div>
+          </dl>
+          <div className="buttonRow">
+            <button className="primary" onClick={onDownload} disabled={busy || !info.available}>
+              Download Update
+            </button>
+            <button onClick={onOpenDownload} disabled={busy || !info.download_path}>
+              Open Download
+            </button>
+          </div>
+          <p className="quiet">Updates are downloaded only after confirmation and verified with the release checksum when GitHub provides one.</p>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function ProbeView({
+  cidr,
+  url,
+  setURL,
+  keyValue,
+  setKey,
+  interval,
+  setInterval,
+  probePath,
+  setProbePath,
+  installPersistent,
+  setInstallPersistent,
+  startAfterInstall,
+  setStartAfterInstall,
+  status,
+  busy,
+  onChooseBinary,
+  onProvision,
+  onRefresh,
+  onAction,
+}: {
+  cidr: string;
+  url: string;
+  setURL: (value: string) => void;
+  keyValue: string;
+  setKey: (value: string) => void;
+  interval: string;
+  setInterval: (value: string) => void;
+  probePath: string;
+  setProbePath: (value: string) => void;
+  installPersistent: boolean;
+  setInstallPersistent: (value: boolean) => void;
+  startAfterInstall: boolean;
+  setStartAfterInstall: (value: boolean) => void;
+  status: ProbeServiceStatus;
+  busy: boolean;
+  onChooseBinary: () => void;
+  onProvision: () => void;
+  onRefresh: () => void;
+  onAction: (action: string) => void;
+}) {
+  return (
+    <section className="probeWrap" aria-label="Probe setup">
+      <div className="probeHeader">
+        <div>
+          <h2>Probe setup</h2>
+          <p className="quiet">Provision the headless service from this desktop configuration.</p>
+        </div>
+        <div className={`probeState ${stateClassName(status.state)}`}>
+          <span>{status.found ? status.state : "probe missing"}</span>
+          <button onClick={onRefresh} disabled={busy}>Refresh</button>
+        </div>
+      </div>
+
+      <div className="probeGrid">
+        <section className="probePanel">
+          <h3>Configuration</h3>
+          <label className="field wide">
+            <span>Current CIDR</span>
+            <input value={cidr} readOnly />
+          </label>
+          <label className="field wide">
+            <span>AnchorDesk URL</span>
+            <input value={url} onChange={(event) => setURL(event.target.value)} placeholder="https://rmm.example.com" />
+          </label>
+          <label className="field wide">
+            <span>Probe API key</span>
+            <input value={keyValue} onChange={(event) => setKey(event.target.value)} type="password" />
+          </label>
+          <label className="field">
+            <span>Interval</span>
+            <input value={interval} onChange={(event) => setInterval(event.target.value)} placeholder="1m" />
+          </label>
+          <label className="toggle">
+            <input type="checkbox" checked={installPersistent} onChange={(event) => setInstallPersistent(event.target.checked)} />
+            <span>Install persistent probe service</span>
+          </label>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={startAfterInstall}
+              onChange={(event) => setStartAfterInstall(event.target.checked)}
+              disabled={!installPersistent}
+            />
+            <span>Start service after install</span>
+          </label>
+          <button className="primary" onClick={onProvision} disabled={busy}>
+            {installPersistent ? "Provision Probe" : "Send Once"}
+          </button>
+        </section>
+
+        <section className="probePanel">
+          <h3>Service</h3>
+          <label className="field wide">
+            <span>Probe binary</span>
+            <input value={probePath} onChange={(event) => setProbePath(event.target.value)} />
+          </label>
+          <label className="field wide">
+            <span>Config file</span>
+            <input value={status.config_path || status.config?.config_path || ""} readOnly />
+          </label>
+          <div className="buttonRow">
+            <button onClick={onChooseBinary} disabled={busy}>Choose</button>
+            <button onClick={() => onAction("start")} disabled={busy || !status.found}>Start</button>
+            <button onClick={() => onAction("stop")} disabled={busy || !status.found}>Stop</button>
+            <button onClick={() => onAction("restart")} disabled={busy || !status.found}>Restart</button>
+            <button onClick={() => onAction("uninstall")} disabled={busy || !status.found}>Uninstall</button>
+          </div>
+          <ProbeOutcome status={status} />
+          <p className="quiet">Service install, start, stop, and uninstall may require administrator or root elevation.</p>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function ProbeOutcome({ status }: { status: ProbeServiceStatus }) {
+  const detail = status.output || status.message;
+  return (
+    <section className={`probeOutcome ${status.severity || "info"}`}>
+      <div>
+        <strong>{status.summary || "Probe status"}</strong>
+        <span>{probeOutcomeDetail(status)}</span>
+      </div>
+      {detail && (
+        <details>
+          <summary>Command details</summary>
+          <pre>{detail}</pre>
+        </details>
+      )}
+    </section>
+  );
+}
+
+function probeOutcomeDetail(status: ProbeServiceStatus) {
+  if (!status.found) return "Choose the netviz-probe binary to manage the service.";
+  if (status.state === "running") return "The persistent probe service is active.";
+  if (status.state === "stopped") return "The service is installed and ready to start.";
+  if (status.state === "not installed") return "Provision the probe to install the persistent service.";
+  return status.message || "Refresh to read the latest service status.";
 }
 
 function TableView({ rows, states, hiddenCount }: { rows: HostObservation[]; states: Record<string, DeviceState>; hiddenCount: number }) {
@@ -721,6 +1184,10 @@ function hostChanged(previous: HostObservation, next: HostObservation) {
 
 function stateClass(state: DeviceState = "stable") {
   return `state-${state}`;
+}
+
+function stateClassName(state: string) {
+  return `state-${state.toLowerCase().replaceAll(" ", "-")}`;
 }
 
 function isVisuallyActive(host: HostObservation) {

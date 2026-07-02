@@ -1,7 +1,7 @@
 # Deploying the NetViz Probe
 
 `netviz-probe` is the unattended NetViz scanner. It runs natively on a customer
-LAN, scans one IPv4 CIDR on an interval, pushes inventory to MaterialTicket, and
+LAN, scans one IPv4 CIDR on an interval, pushes inventory to AnchorDesk, and
 sends heartbeat reports between scans.
 
 Only scan networks you own or are authorized to assess.
@@ -11,7 +11,7 @@ Only scan networks you own or are authorized to assess.
 1. Download the release archive for the host OS and architecture.
 2. Move `netviz-probe` to a permanent location. The service registration uses
    the binary's current absolute path.
-3. Obtain the MaterialTicket base URL and probe API key.
+3. Obtain the AnchorDesk base URL and probe API key.
 4. Choose the directly connected IPv4 CIDR to scan, such as
    `192.168.1.0/24`.
 5. Run a foreground smoke test:
@@ -22,9 +22,45 @@ Only scan networks you own or are authorized to assess.
    ```
 
 The probe must have direct host-network access to the target CIDR and outbound
-HTTP(S) access to MaterialTicket. It is intentionally distributed as a native
+HTTP(S) access to AnchorDesk. It is intentionally distributed as a native
 binary rather than a container because bridged container networking commonly
 breaks ARP discovery and other LAN-local behavior.
+
+## Desktop GUI provisioning
+
+The desktop app includes a **Probe** tab that can provision the same
+`netviz-probe` service used by the command line:
+
+1. Put `netviz` and `netviz-probe` in a stable location on the target machine.
+   The GUI looks for `netviz-probe` next to the desktop app first; use
+   **Choose** if the binary is elsewhere.
+2. Open the desktop app with the privileges required by the host OS service
+   manager. On Windows this usually means **Run as administrator**. On Linux
+   and macOS, command-line installation with `sudo` is still the most reliable
+   path unless the desktop session already has the needed service permissions.
+3. Enter the scan CIDR in the main toolbar. The Probe tab uses that same CIDR.
+4. Enter the AnchorDesk URL, probe API key, and scan/heartbeat interval.
+5. Keep **Install persistent probe service** checked and click
+   **Provision Probe**. The GUI writes a shared probe config file, installs the
+   service as `netviz-probe run -config <path>`, then starts the service if
+   **Start service after install** is checked.
+6. Use **Refresh**, **Start**, **Stop**, **Restart**, or **Uninstall** in the
+   Probe tab to manage the registered service.
+
+When the Probe tab opens, it reads the existing shared config file and fills in
+the CIDR, AnchorDesk URL, key, and interval. Repeating **Provision Probe** is
+idempotent for GUI-managed probes: it updates the config file and keeps the
+service pointed at the same file. The running service re-reads that file before
+each scan cycle, so edits are picked up without a manual restart.
+
+Uncheck **Install persistent probe service** to run a foreground `-once` push
+from the GUI instead of installing the service. This is useful as a connectivity
+smoke test, but it is not durable because it depends on the desktop session.
+
+Legacy services installed before GUI config-file support may report running or
+stopped, but their command-line/env configuration is not portable to read back
+from every OS service manager. Click **Provision Probe** once from the GUI to
+migrate them to the shared config-file layout.
 
 ## Windows service
 
@@ -32,8 +68,8 @@ Open PowerShell as Administrator, set the credentials for the install command,
 and register the service:
 
 ```powershell
-$env:NETVIZ_MATERIALTICKET_URL = "https://rmm.example.com"
-$env:NETVIZ_MATERIALTICKET_KEY = "<probe-api-key>"
+$env:NETVIZ_ANCHORDESK_URL = "https://rmm.example.com"
+$env:NETVIZ_ANCHORDESK_KEY = "<probe-api-key>"
 
 Set-Location "C:\Program Files\NetViz"
 .\netviz-probe.exe install -cidr 192.168.1.0/24 -interval 1m
@@ -58,10 +94,10 @@ Place the binary somewhere stable, for example `/usr/local/bin/netviz-probe`,
 then run:
 
 ```sh
-export NETVIZ_MATERIALTICKET_URL=https://rmm.example.com
-export NETVIZ_MATERIALTICKET_KEY='<probe-api-key>'
+export NETVIZ_ANCHORDESK_URL=https://rmm.example.com
+export NETVIZ_ANCHORDESK_KEY='<probe-api-key>'
 
-sudo --preserve-env=NETVIZ_MATERIALTICKET_URL,NETVIZ_MATERIALTICKET_KEY \
+sudo --preserve-env=NETVIZ_ANCHORDESK_URL,NETVIZ_ANCHORDESK_KEY \
   /usr/local/bin/netviz-probe install \
   -cidr 192.168.1.0/24 -interval 1m
 sudo /usr/local/bin/netviz-probe start
@@ -87,10 +123,10 @@ Place the binary somewhere stable, for example
 `/usr/local/bin/netviz-probe`, then run:
 
 ```sh
-export NETVIZ_MATERIALTICKET_URL=https://rmm.example.com
-export NETVIZ_MATERIALTICKET_KEY='<probe-api-key>'
+export NETVIZ_ANCHORDESK_URL=https://rmm.example.com
+export NETVIZ_ANCHORDESK_KEY='<probe-api-key>'
 
-sudo --preserve-env=NETVIZ_MATERIALTICKET_URL,NETVIZ_MATERIALTICKET_KEY \
+sudo --preserve-env=NETVIZ_ANCHORDESK_URL,NETVIZ_ANCHORDESK_KEY \
   /usr/local/bin/netviz-probe install \
   -cidr 192.168.1.0/24 -interval 1m
 sudo /usr/local/bin/netviz-probe start
@@ -121,18 +157,25 @@ Foreground runs accept:
 | Setting | Flag | Environment variable |
 | --- | --- | --- |
 | Network | `-cidr` | — |
-| MaterialTicket URL | `-url` | `NETVIZ_MATERIALTICKET_URL` |
-| Probe API key | `-key` | `NETVIZ_MATERIALTICKET_KEY` |
+| AnchorDesk URL | `-url` | `NETVIZ_ANCHORDESK_URL` |
+| Probe API key | `-key` | `NETVIZ_ANCHORDESK_KEY` |
 | Scan/heartbeat interval | `-interval` | — |
+| Shared config file | `-config` | — |
 
-For service installation, prefer environment variables for the URL and key so
-the key is not recorded in shell history or the registered command line. The
-installer copies those values into the native service definition. Treat the
-host as credential-bearing infrastructure and rotate the probe key when the
-host is retired or compromised.
+For GUI-managed service installation, the URL and key are stored in a
+service-readable JSON config file instead of the registered service command
+line. By default the file is:
 
-To change the CIDR, interval, URL, or key in v0.1.0, stop and uninstall the
-service, then install it again with the new values.
+- Windows: `%ProgramData%\NetViz\probe.json`
+- Linux: `/etc/netviz/probe.json`
+- macOS: `/Library/Application Support/NetViz/probe.json`
+
+Treat the host and config file as credential-bearing infrastructure and rotate
+the probe key when the host is retired or compromised.
+
+To change the CIDR, interval, URL, or key for a GUI-managed probe, edit the
+Probe tab and click **Provision Probe**. The service re-reads the config before
+its next scan cycle.
 
 ## Upgrade
 
@@ -149,7 +192,7 @@ version changes.
 - `permission denied`, `access denied`, or an install failure usually means the
   terminal is not elevated.
 - `service is not installed` means `install` has not completed for this binary.
-- A heartbeat or push failure means the host cannot reach MaterialTicket, the
+- A heartbeat or push failure means the host cannot reach AnchorDesk, the
   URL is wrong, or the probe key was rejected.
 - A scan failure usually means the CIDR is invalid or the service account lacks
   required local network access.
