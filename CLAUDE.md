@@ -42,6 +42,10 @@ longer accurate. v0.0.1 now includes:
 - The AnchorDesk integration lives in `internal/anchordesk` and depends
   only on `internal/model`. The probe may depend on the scanner core and
   `internal/anchordesk`.
+- The server may depend on `internal/anchordesk` (it accepts the same v1
+  probe wire contract) and `internal/storage`, never on Wails or desktop
+  code. The server web UI source lives in `web/` and builds into
+  `internal/server/webdist` (committed; rebuilt with `make build-web`).
 - Scanner events are the primary integration surface.
 - Keep scanner configuration constrained and explicit. Validate CIDR input. Do
   not add arbitrary scanner flags.
@@ -66,6 +70,8 @@ longer accurate. v0.0.1 now includes:
   tenancy, each probe reports to its own company).
 - v0.4.0: polish, hardening, performance, packaging/signing, updater
   completion, vendor enrichment, per-device history, and docs.
+- v0.5.0: server sign-in with SSO — OIDC first-class, SAML2 demand-driven;
+  probe endpoints keep key auth. Required before 1.0.0.
 - v1.0.0: stability freeze — frozen probe contract v1, versioned file/config/
   schema formats with migration, semver policy, and a security posture doc.
 

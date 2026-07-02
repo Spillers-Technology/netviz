@@ -170,9 +170,28 @@ Other targets:
 make test          # go test ./...
 make lint          # go vet ./...
 make build-cli     # native CLI scanner
-make build-server  # placeholder server (see roadmap)
+make build-server  # netviz-server: probe ingest + web UI
 make build-probe   # netviz-probe headless scanner (see "Headless probe" above)
+make build-web     # rebuild the server web UI into internal/server/webdist
 ```
+
+### Server mode
+
+`netviz-server` accepts device pushes from `netviz-probe` (the same v1 wire
+contract used for AnchorDesk) and serves the latest network state as a web UI
+with an interactive canvas network map:
+
+```sh
+docker run -p 8080:8080 -e NETVIZ_INGEST_KEY=your-probe-key \
+  -v netviz-data:/data ghcr.io/spillers-technology/netviz
+
+# then point a probe at it
+netviz-probe -url http://server-host:8080 -key your-probe-key -cidr 192.168.1.0/24
+```
+
+Probe endpoints are disabled until an ingest key is configured
+(`-ingest-key` or `NETVIZ_INGEST_KEY`). Open `http://server-host:8080/?demo`
+to preview the map with sample data before wiring a probe.
 
 The SQLite history store uses the pure-Go `modernc.org/sqlite` driver, so no
 CGO is required.
@@ -196,9 +215,9 @@ Current consumers   Desktop table · grouped graph · hierarchy map
                     CLI JSON output · file save/open · CSV export
                     SQLite history + diff · monitor mode
                     netviz-probe AnchorDesk reporter
+                    netviz-server ingest + web UI network map
 
-Future consumers    Server ingest endpoint · web UI latest-state view
-                    websocket event streamer
+Future consumers    websocket event streamer
 ```
 
 ---
@@ -210,11 +229,15 @@ Future consumers    Server ingest endpoint · web UI latest-state view
 - **v0.0.2** — visual polish, packaging, signed installers, screenshots
 - **v0.0.3** — history/diff UX and scan management
 - **v0.1.0** — `netviz-probe` headless scanner with AnchorDesk device push
-  and heartbeat reporting *(current)*
-- **v0.1.5** — single-tenant server ingest + Docker image at
-  `ghcr.io/spillers-technology/netviz`
-- **v0.1.9** — multi-tenant hosted/server mode with probe enrollment
-- **v0.2.0** — performance, accessibility, and docs
+  and heartbeat reporting
+- **v0.2.0** — desktop probe management GUI and release updater
+- **v0.3.0** — single-tenant server ingest, web UI network map, and Docker
+  image at `ghcr.io/spillers-technology/netviz` *(current)*
+- **v0.4.0** — polish: packaging/signing, updater completion, vendor
+  enrichment, per-device history
+- **v0.5.0** — server sign-in with SSO (OIDC; SAML2 as needed)
+- **v1.0.0** — stability freeze: frozen probe contract, versioned formats,
+  semver policy, security posture
 
 See [MILESTONES.md](MILESTONES.md) for acceptance criteria,
 [CHANGELOG.md](CHANGELOG.md) for release notes, and

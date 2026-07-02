@@ -232,23 +232,44 @@ Goal: add single-tenant server ingest and a useful containerized web UI.
 (Renumbered from the original v0.1.5 milestone; v0.2.0 shipped desktop probe
 management first.)
 
-Features:
+Status: shipped July 2, 2026.
 
-- Go HTTP server mode.
-- Docker image published to `ghcr.io/spillers-technology/netviz`.
-- Server receives scan observations from probes.
-- Server stores scan runs and host observations.
-- Server renders latest state in a React web UI.
+Done:
+
+- Go HTTP server mode: `netviz-server -addr -db -ingest-key`.
+- Server accepts the same v1 probe wire contract as AnchorDesk
+  (`POST /probe/devices`, `POST /probe/heartbeat`, `X-Probe-Key`), so an
+  existing probe points at either backend unchanged. Ingest is deny-by-default
+  until a key is configured.
+- Each push is stored as a scan run with host observations in the shared
+  SQLite store; retention pruning keeps the newest 500 runs so interval
+  pushes cannot grow the database without bound.
+- `GET /api/state` (latest run + devices + probe heartbeat) and real
+  `GET /api/scans`.
+- Embedded React web UI: stat tiles, probe heartbeat badge, device table,
+  and an interactive canvas network map — hub-and-cluster constellation
+  layout with phyllotaxis packing, bundled curved edges, breathing glow on
+  live devices, hover tooltips, click-to-inspect, wheel zoom, drag pan, and
+  a clickable category legend using the CVD-validated palette. `?demo`
+  renders sample data for a first look without a probe.
+- Docker image with a `/data` volume; compose file wires
+  `NETVIZ_INGEST_KEY`. Web UI assets are committed to
+  `internal/server/webdist` (rebuilt via `make build-web`) so `go build` and
+  the Docker build never need node.
+- Meet-in-the-middle test drives the real probe client against the server:
+  created on first push, updated on re-push, no duplicates.
 
 Non-goals:
 
 - Multi-tenancy (dropped from the roadmap — see below).
+- Web UI sign-in (v0.5.0 adds SSO; run the server on a trusted network until
+  then).
 
 Acceptance criteria:
 
-- `docker run -p 8080:8080 ghcr.io/spillers-technology/netviz` serves the app.
-- Server accepts probe observations.
-- Latest network state renders in the web UI.
+- `docker run -p 8080:8080 ghcr.io/spillers-technology/netviz` serves the app. (done)
+- Server accepts probe observations. (done: live smoke + contract tests)
+- Latest network state renders in the web UI. (done)
 
 ## Dropped: Multi-Tenant Hosted Mode (was v0.1.9)
 
@@ -290,6 +311,39 @@ Acceptance criteria:
 - Common install paths are documented.
 - UI remains responsive during expected scans.
 
+## v0.5.0: Server Sign-In and SSO
+
+Goal: put the server web UI and read APIs behind authenticated sign-in so a
+NetViz server can sit somewhere more hostile than a trusted LAN segment.
+Required before 1.0.0.
+
+Features:
+
+- OIDC sign-in (Authorization Code + PKCE) against any standard identity
+  provider (Entra ID, Google, Keycloak, Authentik), configured via
+  issuer/client flags or environment.
+- Secure cookie sessions with sensible expiry; logout.
+- SAML2 support if a real deployment needs it — OIDC is the first-class
+  path, SAML2 is demand-driven.
+- Optional local break-glass admin credential for recovery when the IdP is
+  unreachable, disabled by default.
+- Probe endpoints keep `X-Probe-Key` auth — machines don't do SSO.
+- Auth disabled mode preserved for trusted-LAN deployments, explicit and
+  logged, never the silent default when an issuer is configured.
+
+Non-goals:
+
+- User management, roles, or per-user data (single-tenant remains).
+- Multi-tenancy.
+
+Acceptance criteria:
+
+- With OIDC configured, all web/API routes except `/healthz` and the probe
+  endpoints require a session.
+- Sign-in round-trips against at least one real IdP and one local Keycloak.
+- Session cookies are Secure, HttpOnly, SameSite; secrets never land in
+  process listings.
+
 ## v1.0.0: Stability Freeze
 
 Goal: commit to the compatibility guarantees that make NetViz safe to depend
@@ -316,6 +370,7 @@ Acceptance criteria:
   from the GUI, point it at a self-hosted Docker server or AnchorDesk, and
   later upgrade all three components without losing history or breaking the
   wire contract.
+- A server exposed beyond a trusted LAN requires SSO sign-in (v0.5.0).
 - `go test ./...`, `go vet ./...`, and frontend builds pass on all release
   platforms.
 - Upgrading from the previous release preserves local history and probe

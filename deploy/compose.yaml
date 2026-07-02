@@ -1,9 +1,17 @@
 services:
   netviz:
-    image: ghcr.io/spilloid/netviz:local
+    image: ghcr.io/spillers-technology/netviz:latest
     build:
       context: ..
       dockerfile: deploy/Dockerfile
     ports:
       - "8080:8080"
+    environment:
+      # Probes authenticate with this key on X-Probe-Key. Ingest is disabled
+      # until it is set.
+      NETVIZ_INGEST_KEY: ${NETVIZ_INGEST_KEY:?set NETVIZ_INGEST_KEY}
+    volumes:
+      - netviz-data:/data
 
+volumes:
+  netviz-data:
