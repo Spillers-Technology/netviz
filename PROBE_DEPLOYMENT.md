@@ -38,21 +38,28 @@ breaks ARP discovery and other LAN-local behavior.
 The desktop app includes a **Probe** tab that can provision the same
 `netviz-probe` service used by the command line:
 
-1. Put `netviz` and `netviz-probe` in a stable location on the target machine.
-   The GUI looks for `netviz-probe` next to the desktop app first; use
-   **Choose** if the binary is elsewhere.
-2. Open the desktop app with the privileges required by the host OS service
+1. Open the desktop app with the privileges required by the host OS service
    manager. On Windows this usually means **Run as administrator**. On Linux
    and macOS, command-line installation with `sudo` is still the most reliable
    path unless the desktop session already has the needed service permissions.
-3. Enter the scan CIDR in the main toolbar. The Probe tab uses that same CIDR.
-4. Enter the AnchorDesk URL, probe API key, and scan/heartbeat interval.
-5. Keep **Install persistent probe service** checked and click
-   **Provision Probe**. The GUI writes a shared probe config file, installs the
-   service as `netviz-probe run -config <path>`, then starts the service if
-   **Start service after install** is checked.
-6. Use **Refresh**, **Start**, **Stop**, **Restart**, or **Uninstall** in the
+2. Enter the scan CIDR in the main toolbar. The Probe tab uses that same CIDR.
+3. Enter the AnchorDesk URL, probe API key, and scan/heartbeat interval.
+4. Keep **Install persistent probe service** checked and click
+   **Provision Probe**. The GUI copies `netviz-probe` to the standard install
+   location — `C:\Program Files\NetViz\netviz-probe.exe` on Windows,
+   `/usr/local/bin/netviz-probe` on Linux and macOS — writes a shared probe
+   config file, installs the service as `netviz-probe run -config <path>` from
+   that install location, then starts the service if **Start service after
+   install** is checked.
+5. Use **Refresh**, **Start**, **Stop**, **Restart**, or **Uninstall** in the
    Probe tab to manage the registered service.
+
+The GUI finds `netviz-probe` on its own: it prefers the copy at the standard
+install location and falls back to the binary shipped alongside the desktop
+app (when the two differ in version, provisioning deploys the bundled one, so
+desktop upgrades carry the probe forward). **Locate netviz-probe…** appears
+only when neither is found — for example when the desktop binary was moved out
+of its release archive.
 
 When the Probe tab opens, it reads the existing shared config file and fills in
 the CIDR, AnchorDesk URL, key, and interval. Repeating **Provision Probe** is
@@ -193,6 +200,10 @@ its next scan cycle.
 
 The service registration does not need to be recreated when only the binary
 version changes.
+
+GUI-managed probes upgrade with the desktop app: after updating the desktop,
+click **Provision Probe** and the GUI deploys its bundled probe version to the
+standard install location and re-registers the service.
 
 ## Troubleshooting
 

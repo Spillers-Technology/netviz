@@ -74,6 +74,7 @@ input {
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: end;
   gap: 8px;
   padding: 12px;
@@ -159,7 +160,8 @@ button.primary:hover:not(:disabled),
 
 .status {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   padding: 8px 12px;
   color: #2a3541;
   font-size: 13px;
@@ -172,11 +174,52 @@ button.primary:hover:not(:disabled),
 }
 
 .error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 8px 12px;
   border: 1px solid #c50f1f;
   border-radius: 8px;
   background: #fdf3f4;
   color: #9a0d19;
+}
+
+.error span {
+  overflow-wrap: anywhere;
+}
+
+.errorDismiss {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-color: #e3a4aa;
+  color: #9a0d19;
+  background: transparent;
+}
+
+.crashShell .error {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  max-width: 560px;
+  margin: 48px auto;
+}
+
+.crashShell .error button {
+  align-self: flex-start;
+}
+
+.crashDetail {
+  margin: 0;
+  padding: 8px;
+  width: 100%;
+  overflow-x: auto;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #e3c2c6;
+  border-radius: 6px;
+  white-space: pre-wrap;
 }
 
 .tableWrap,
@@ -257,18 +300,19 @@ tbody tr:hover td {
 .graphRoot {
   position: relative;
   display: grid;
-  align-content: center;
+  align-content: start;
   justify-items: center;
   gap: 12px;
   align-items: center;
   justify-content: center;
+  padding-top: 36px;
   border-right: 1px solid var(--border);
 }
 
 .graphRoot::after {
   content: "";
   position: absolute;
-  top: 50%;
+  top: 78px;
   right: -16px;
   width: 16px;
   height: 2px;
@@ -298,7 +342,7 @@ tbody tr:hover td {
 
 .graphGroups {
   display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 12px;
   align-content: start;
 }
@@ -433,6 +477,10 @@ tbody tr:hover td {
   gap: 6px;
 }
 
+.detailHeader h2 {
+  overflow-wrap: anywhere;
+}
+
 .detailBadges {
   display: flex;
   flex-wrap: wrap;
@@ -538,6 +586,12 @@ tbody tr:hover td {
   color: var(--text-muted);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+.miniHistoryRow span:last-child {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .portsPanel p {

@@ -158,6 +158,38 @@ func TestSQLiteStoreSaveListAndDiff(t *testing.T) {
 	}
 }
 
+func TestNilOpenPortsRoundTripNonNil(t *testing.T) {
+	ctx := context.Background()
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "netviz.db"))
+	if err != nil {
+		t.Fatalf("OpenSQLite: %v", err)
+	}
+	defer store.Close()
+
+	down := host("192.168.1.20", "down.local", false, "unknown")
+	down.OpenPorts = nil
+	run := model.ScanRun{ID: "run", CIDR: "192.168.1.0/24", StartedAt: time.Now().UTC()}
+	if err := store.SaveScanRun(ctx, run, []model.HostObservation{down}); err != nil {
+		t.Fatalf("SaveScanRun: %v", err)
+	}
+
+	hosts, err := store.HostsForRun(ctx, "run")
+	if err != nil {
+		t.Fatalf("HostsForRun: %v", err)
+	}
+	if len(hosts) != 1 || hosts[0].OpenPorts == nil {
+		t.Fatalf("HostsForRun open ports: %#v, want non-nil empty slice", hosts)
+	}
+
+	history, err := store.HostHistory(ctx, "192.168.1.20", 10)
+	if err != nil {
+		t.Fatalf("HostHistory: %v", err)
+	}
+	if len(history) != 1 || history[0].Host.OpenPorts == nil {
+		t.Fatalf("HostHistory open ports: %#v, want non-nil empty slice", history)
+	}
+}
+
 func host(ip string, hostname string, alive bool, deviceType string, ports ...int) model.HostObservation {
 	now := time.Now().UTC()
 	openPorts := make([]model.PortObservation, 0, len(ports))

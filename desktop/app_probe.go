@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -41,8 +42,9 @@ type ProbeConfigState struct {
 }
 
 type ProbeServiceStatus struct {
-	ProbePath  string            `json:"probe_path"`
-	ConfigPath string            `json:"config_path"`
+	ProbePath   string            `json:"probe_path"`
+	InstallPath string            `json:"install_path"`
+	ConfigPath  string            `json:"config_path"`
 	Config     *ProbeConfigState `json:"config,omitempty"`
 	Found      bool              `json:"found"`
 	State      string            `json:"state"`
@@ -70,16 +72,17 @@ func (a *App) GetProbeStatus(probePath string) (ProbeServiceStatus, error) {
 	path, found := resolveProbeBinary(probePath)
 	configPath, config := loadProbeConfigState()
 	status := ProbeServiceStatus{
-		ProbePath:  path,
-		ConfigPath: configPath,
-		Config:     config,
-		Found:      found,
-		State:      "missing",
-		Severity:   "warning",
-		Summary:    "Probe binary not found",
+		ProbePath:   path,
+		InstallPath: probeInstallPath(),
+		ConfigPath:  configPath,
+		Config:      config,
+		Found:       found,
+		State:       "missing",
+		Severity:    "warning",
+		Summary:     "Probe binary not found",
 	}
 	if !found {
-		status.Message = "netviz-probe was not found next to the desktop app"
+		status.Message = fmt.Sprintf("netviz-probe was not found in %s or next to the desktop app", filepath.Dir(probeInstallPath()))
 		return status, nil
 	}
 
@@ -103,10 +106,6 @@ func (a *App) ProvisionProbe(req ProbeSetupRequest) (ProbeServiceStatus, error) 
 	if err := validateProbeSetup(req); err != nil {
 		return ProbeServiceStatus{}, err
 	}
-	path, found := resolveProbeBinary(req.ProbePath)
-	if !found {
-		return ProbeServiceStatus{}, fmt.Errorf("netviz-probe was not found; choose the probe binary first")
-	}
 	interval, _ := parseProbeInterval(req.Interval)
 	configPath, err := probeconfig.DefaultPath()
 	if err != nil {
@@ -120,32 +119,48 @@ func (a *App) ProvisionProbe(req ProbeSetupRequest) (ProbeServiceStatus, error) 
 	}
 
 	var outputs []string
+	var path string
 	if req.InstallPersistent {
+		source, found := resolveProbeSource(req.ProbePath)
+		if !found {
+			return ProbeServiceStatus{}, fmt.Errorf("netviz-probe was not found in %s or next to the desktop app; choose the probe binary from the NetViz download", filepath.Dir(probeInstallPath()))
+		}
+		path = probeInstallPath()
+		needCopy := !samePath(source, path)
+
 		_, existingConfig := loadProbeConfigState()
 		if err := probeconfig.Save(configPath, cfg); err != nil {
 			return ProbeServiceStatus{}, fmt.Errorf("write probe config %s: %w", configPath, err)
 		}
 		outputs = append(outputs, fmt.Sprintf("wrote probe config: %s", configPath))
 
-		status, err := a.GetProbeStatus(path)
+		status, err := a.GetProbeStatus(source)
 		if err != nil {
 			return ProbeServiceStatus{}, err
 		}
 		serviceState := status.State
-		needsInstall := status.State != "running" && status.State != "stopped"
+		// A new binary means the service registration must be redone against
+		// the standard install path, so a copy always forces a reinstall.
+		needsInstall := needCopy || (status.State != "running" && status.State != "stopped")
 		if existingConfig == nil {
 			needsInstall = true
 		}
 		installed := false
 		started := false
 		if needsInstall {
-			output, stopErr := runProbeCommand(context.Background(), path, nil, "stop")
+			output, stopErr := runProbeCommand(context.Background(), source, nil, "stop")
 			if stopErr == nil && output != "" {
 				outputs = append(outputs, output)
 			}
-			output, uninstallErr := runProbeCommand(context.Background(), path, nil, "uninstall")
+			output, uninstallErr := runProbeCommand(context.Background(), source, nil, "uninstall")
 			if uninstallErr == nil && output != "" {
 				outputs = append(outputs, output)
+			}
+			if needCopy {
+				if err := installProbeBinary(source, path); err != nil {
+					return ProbeServiceStatus{}, fmt.Errorf("install netviz-probe to %s: %w", path, err)
+				}
+				outputs = append(outputs, fmt.Sprintf("installed probe binary: %s", path))
 			}
 			output, err = runProbeCommand(context.Background(), path, nil, "install", "-config="+configPath)
 			outputs = append(outputs, output)
@@ -165,6 +180,11 @@ func (a *App) ProvisionProbe(req ProbeSetupRequest) (ProbeServiceStatus, error) 
 		}
 		outputs = append([]string{probeProvisionSummary(installed, started, configPath)}, outputs...)
 	} else {
+		var found bool
+		path, found = resolveProbeBinary(req.ProbePath)
+		if !found {
+			return ProbeServiceStatus{}, fmt.Errorf("netviz-probe was not found; choose the probe binary first")
+		}
 		env := probeCredentialEnv(req)
 		args := []string{"run", "-cidr=" + strings.TrimSpace(req.CIDR), "-interval=" + interval.String(), "-once"}
 		output, err := runProbeCommand(context.Background(), path, env, args...)
@@ -294,9 +314,116 @@ func resolveProbeBinary(preferred string) (string, bool) {
 	return probeBinaryCandidates()[0], false
 }
 
+// probeInstallPath is the standard system location the desktop deploys the
+// probe binary to before registering the service, so the service never runs
+// out of a download folder or build tree that may move or disappear.
+func probeInstallPath() string {
+	if runtime.GOOS == "windows" {
+		programFiles := os.Getenv("ProgramFiles")
+		if programFiles == "" {
+			programFiles = `C:\Program Files`
+		}
+		return filepath.Join(programFiles, "NetViz", probeBinaryName())
+	}
+	return filepath.Join("/usr/local/bin", probeBinaryName())
+}
+
+// resolveProbeSource picks the binary a persistent provision deploys: an
+// explicitly chosen path wins, then a binary shipped alongside the desktop
+// app whenever its version differs from the installed copy (so desktop
+// upgrades carry the probe forward), then the installed copy itself.
+func resolveProbeSource(preferred string) (string, bool) {
+	if preferred = strings.TrimSpace(preferred); preferred != "" {
+		return preferred, isExecutableFile(preferred)
+	}
+	installPath := probeInstallPath()
+	installed := isExecutableFile(installPath)
+	var bundled string
+	for _, candidate := range probeBinaryCandidates() {
+		if samePath(candidate, installPath) || !isExecutableFile(candidate) {
+			continue
+		}
+		bundled = candidate
+		break
+	}
+	switch {
+	case bundled != "" && !installed:
+		return bundled, true
+	case bundled != "" && installed:
+		bundledVersion := probeVersion(bundled)
+		installedVersion := probeVersion(installPath)
+		if bundledVersion == "" || installedVersion == "" || bundledVersion != installedVersion {
+			return bundled, true
+		}
+		return installPath, true
+	case installed:
+		return installPath, true
+	default:
+		return installPath, false
+	}
+}
+
+func probeVersion(path string) string {
+	output, err := runProbeCommand(context.Background(), path, nil, "version")
+	if err != nil {
+		return ""
+	}
+	return output
+}
+
+// installProbeBinary copies the probe into place through a temp file and
+// rename so a failed copy never leaves a truncated binary at the install
+// path. The caller stops and uninstalls the service first; a running service
+// would keep the destination locked on Windows.
+func installProbeBinary(source, dest string) error {
+	in, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return elevationHint(err)
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(dest), "netviz-probe-*.tmp")
+	if err != nil {
+		return elevationHint(err)
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := io.Copy(tmp, in); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o755); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp.Name(), dest); err != nil {
+		return elevationHint(err)
+	}
+	return nil
+}
+
+func elevationHint(err error) error {
+	if errors.Is(err, os.ErrPermission) {
+		return fmt.Errorf("%w (run NetViz as administrator or root to install the probe binary)", err)
+	}
+	return err
+}
+
+func samePath(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
+}
+
 func probeBinaryCandidates() []string {
 	name := probeBinaryName()
-	var dirs []string
+	dirs := []string{filepath.Dir(probeInstallPath())}
 	if executable, err := os.Executable(); err == nil {
 		exeDir := filepath.Dir(executable)
 		dirs = append(dirs, exeDir, filepath.Dir(exeDir), filepath.Join(exeDir, "bin"))

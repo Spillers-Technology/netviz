@@ -91,7 +91,7 @@ func (s *SQLiteStore) SaveScanRun(ctx context.Context, run model.ScanRun, hosts 
 	defer stmt.Close()
 
 	for _, host := range hosts {
-		portsJSON, err := json.Marshal(host.OpenPorts)
+		portsJSON, err := marshalPorts(host.OpenPorts)
 		if err != nil {
 			return err
 		}
@@ -238,7 +238,7 @@ func (s *SQLiteStore) HostHistory(ctx context.Context, ip string, limit int) ([]
 		if entry.Host.LastUpdate, err = parseTime(lastUpdated); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal([]byte(portsJSON), &entry.Host.OpenPorts); err != nil {
+		if entry.Host.OpenPorts, err = unmarshalPorts(portsJSON); err != nil {
 			return nil, err
 		}
 		entries = append(entries, entry)
@@ -443,8 +443,29 @@ func hostFromRows(row scanRunScanner) (model.HostObservation, error) {
 	if err != nil {
 		return host, err
 	}
-	err = json.Unmarshal([]byte(portsJSON), &host.OpenPorts)
+	host.OpenPorts, err = unmarshalPorts(portsJSON)
 	return host, err
+}
+
+// marshalPorts and unmarshalPorts keep open_ports_json and the decoded slice
+// non-nil so hosts with no open ports round-trip as [] rather than null;
+// consumers (the desktop frontend in particular) index the slice directly.
+func marshalPorts(ports []model.PortObservation) ([]byte, error) {
+	if ports == nil {
+		ports = []model.PortObservation{}
+	}
+	return json.Marshal(ports)
+}
+
+func unmarshalPorts(portsJSON string) ([]model.PortObservation, error) {
+	ports := []model.PortObservation{}
+	if err := json.Unmarshal([]byte(portsJSON), &ports); err != nil {
+		return nil, err
+	}
+	if ports == nil {
+		ports = []model.PortObservation{}
+	}
+	return ports, nil
 }
 
 func summarizeHosts(hosts []model.HostObservation) (hostCount int, aliveCount int, openPortCount int) {

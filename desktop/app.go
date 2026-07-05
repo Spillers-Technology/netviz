@@ -183,6 +183,7 @@ func (a *App) OpenScanFile() ([]model.HostObservation, error) {
 	a.mu.Lock()
 	a.results = make(map[string]model.HostObservation, len(saved.Hosts))
 	for _, host := range saved.Hosts {
+		host.OpenPorts = clonePorts(host.OpenPorts)
 		a.results[host.IP] = host
 	}
 	a.mu.Unlock()
@@ -292,7 +293,7 @@ func (a *App) consumeEvents(events <-chan model.ScanEvent) {
 	run := a.run
 	hosts := make([]model.HostObservation, 0, len(a.results))
 	for _, host := range a.results {
-		host.OpenPorts = append([]model.PortObservation(nil), host.OpenPorts...)
+		host.OpenPorts = clonePorts(host.OpenPorts)
 		hosts = append(hosts, host)
 	}
 	history := a.history
@@ -339,13 +340,20 @@ func (a *App) snapshotHosts() []model.HostObservation {
 	defer a.mu.Unlock()
 	hosts := make([]model.HostObservation, 0, len(a.results))
 	for _, host := range a.results {
-		host.OpenPorts = append([]model.PortObservation(nil), host.OpenPorts...)
+		host.OpenPorts = clonePorts(host.OpenPorts)
 		hosts = append(hosts, host)
 	}
 	sort.Slice(hosts, func(i, j int) bool {
 		return hosts[i].IP < hosts[j].IP
 	})
 	return hosts
+}
+
+// clonePorts copies a host's port list and never returns nil: a nil slice
+// serializes to JSON null, which the frontend and saved scan files treat as
+// a list and index into.
+func clonePorts(ports []model.PortObservation) []model.PortObservation {
+	return append(make([]model.PortObservation, 0, len(ports)), ports...)
 }
 
 func formatPorts(ports []model.PortObservation) string {

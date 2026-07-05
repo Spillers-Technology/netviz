@@ -50,6 +50,7 @@ type ScanDiff = {
 
 type ProbeServiceStatus = {
   probe_path: string;
+  install_path: string;
   config_path: string;
   config?: ProbeConfigState;
   found: boolean;
@@ -176,6 +177,7 @@ function App() {
   });
   const [probeStatus, setProbeStatus] = useState<ProbeServiceStatus>({
     probe_path: "",
+    install_path: "",
     config_path: "",
     found: false,
     state: "unknown",
@@ -317,7 +319,7 @@ function App() {
 
   function applyHostEvent(event: ScanEvent) {
     if (!event.host) return;
-    const incoming = event.host;
+    const incoming = normalizeHost(event.host);
     setHosts((current) => {
       const previous = current[incoming.ip];
       if (monitoringRef.current && event.type === "host_seen" && previous) {
@@ -337,7 +339,7 @@ function App() {
   function loadHosts(opened: HostObservation[]) {
     const nextHosts: Record<string, HostObservation> = {};
     for (const host of opened) {
-      nextHosts[host.ip] = host;
+      nextHosts[host.ip] = normalizeHost(host);
     }
     setHosts(nextHosts);
     setDeviceStates({});
@@ -523,7 +525,12 @@ function App() {
   return (
     <main className="shell">
       <section className="toolbar" aria-label="Scan controls">
-        <div className="fileMenu">
+        <div
+          className="fileMenu"
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node)) setFileOpen(false);
+          }}
+        >
           <button onClick={() => setFileOpen((open) => !open)}>File</button>
           {fileOpen && (
             <div className="fileMenuList">
@@ -583,7 +590,14 @@ function App() {
         ))}
       </nav>
 
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <div className="error" role="alert">
+          <span>{error}</span>
+          <button className="errorDismiss" onClick={() => setError("")} aria-label="Dismiss error">
+            ×
+          </button>
+        </div>
+      )}
 
       {tab === "table" && <TableView rows={visibleRows} states={deviceStates} hiddenCount={hiddenCheckedOnly} />}
       {tab === "graph" && <GraphView hosts={visibleRows} states={deviceStates} />}
@@ -599,7 +613,6 @@ function App() {
           interval={probeInterval}
           setInterval={setProbeInterval}
           probePath={probePath}
-          setProbePath={setProbePath}
           installPersistent={installPersistent}
           setInstallPersistent={setInstallPersistent}
           startAfterInstall={startAfterInstall}
@@ -717,7 +730,6 @@ function ProbeView({
   interval,
   setInterval,
   probePath,
-  setProbePath,
   installPersistent,
   setInstallPersistent,
   startAfterInstall,
@@ -737,7 +749,6 @@ function ProbeView({
   interval: string;
   setInterval: (value: string) => void;
   probePath: string;
-  setProbePath: (value: string) => void;
   installPersistent: boolean;
   setInstallPersistent: (value: boolean) => void;
   startAfterInstall: boolean;
@@ -795,29 +806,37 @@ function ProbeView({
             <span>Start service after install</span>
           </label>
           <button className="primary" onClick={onProvision} disabled={busy}>
-            {installPersistent ? "Provision Probe" : "Send Once"}
+            {busy ? "Working…" : installPersistent ? "Provision Probe" : "Send Once"}
           </button>
         </section>
 
         <section className="probePanel">
           <h3>Service</h3>
           <label className="field wide">
-            <span>Probe binary</span>
-            <input value={probePath} onChange={(event) => setProbePath(event.target.value)} />
+            <span>Install location</span>
+            <input value={status.install_path} readOnly />
           </label>
           <label className="field wide">
             <span>Config file</span>
             <input value={status.config_path || status.config?.config_path || ""} readOnly />
           </label>
           <div className="buttonRow">
-            <button onClick={onChooseBinary} disabled={busy}>Choose</button>
             <button onClick={() => onAction("start")} disabled={busy || !status.found}>Start</button>
             <button onClick={() => onAction("stop")} disabled={busy || !status.found}>Stop</button>
             <button onClick={() => onAction("restart")} disabled={busy || !status.found}>Restart</button>
             <button onClick={() => onAction("uninstall")} disabled={busy || !status.found}>Uninstall</button>
+            {!status.found && (
+              <button onClick={onChooseBinary} disabled={busy}>Locate netviz-probe…</button>
+            )}
           </div>
+          {probePath && status.install_path && probePath !== status.install_path && (
+            <p className="quiet">Next provision deploys {probePath} to the install location.</p>
+          )}
           <ProbeOutcome status={status} />
-          <p className="quiet">Service install, start, stop, and uninstall may require administrator or root elevation.</p>
+          <p className="quiet">
+            Provisioning installs netviz-probe to the location above and runs the service from
+            there. Install, start, stop, and uninstall may require administrator or root elevation.
+          </p>
         </section>
       </div>
     </section>
@@ -843,7 +862,7 @@ function ProbeOutcome({ status }: { status: ProbeServiceStatus }) {
 }
 
 function probeOutcomeDetail(status: ProbeServiceStatus) {
-  if (!status.found) return "Choose the netviz-probe binary to manage the service.";
+  if (!status.found) return "netviz-probe was not found. It ships in the bin folder of the NetViz download — locate it to continue.";
   if (status.state === "running") return "The persistent probe service is active.";
   if (status.state === "stopped") return "The service is installed and ready to start.";
   if (status.state === "not installed") return "Provision the probe to install the persistent service.";
@@ -995,7 +1014,7 @@ function HierarchyView({ hosts, states }: { hosts: HostObservation[]; states: Re
         </div>
 
         <div className="radialMap">
-          <svg className="edges" viewBox="0 0 1000 620" role="presentation" aria-hidden="true">
+          <svg className="edges" viewBox="0 0 1000 620" preserveAspectRatio="none" role="presentation" aria-hidden="true">
             {layout.map((item) => (
               <line key={`edge-${item.host.ip}`} x1="500" y1="310" x2={item.x} y2={item.y} />
             ))}
@@ -1097,7 +1116,9 @@ function DeviceDetail({ host, state = "stable" }: { host?: HostObservation; stat
     if (!ip) return;
     window.go?.main?.App?.HostHistory(ip)
       .then((entries) => {
-        if (!cancelled) setHistory(entries || []);
+        if (!cancelled) {
+          setHistory((entries || []).map((entry) => ({ ...entry, host: normalizeHost(entry.host) })));
+        }
       })
       .catch(() => {});
     return () => {
@@ -1312,19 +1333,35 @@ function hierarchyLayout(hosts: HostObservation[]) {
   });
   const centerX = 500;
   const centerY = 310;
-  return sorted.map((host, index) => {
-    const ringIndex = Math.floor((Math.sqrt(index + 1) - 1) / 1.55);
-    const ringStart = Math.max(0, Math.floor((ringIndex * 1.55 + 1) ** 2) - 1);
-    const ringCapacity = Math.max(12, Math.ceil(18 + ringIndex * 14));
-    const position = index - ringStart;
-    const angle = (position / ringCapacity) * Math.PI * 2 - Math.PI / 2 + ringIndex * 0.21;
-    const radius = Math.min(286, 82 + ringIndex * 42);
-    return {
-      host,
-      x: centerX + Math.cos(angle) * radius,
-      y: centerY + Math.sin(angle) * radius,
-      size: nodeSize(host),
-    };
+  const innerRadius = 132;
+  const ringGap = 80;
+  const maxRadius = 276;
+
+  // Fill rings inside-out with capacity proportional to circumference, then
+  // spread each ring's actual occupants around the full circle — a partial
+  // ring must never bunch into an arc.
+  const spacing = sorted.length > 90 ? 36 : sorted.length > 40 ? 46 : 58;
+  const sizeScale = sorted.length > 90 ? 0.7 : 1;
+  const rings: HostObservation[][] = [];
+  for (let taken = 0, ring = 0; taken < sorted.length; ring += 1) {
+    const capacity = Math.max(8, Math.floor((2 * Math.PI * (innerRadius + ring * ringGap)) / spacing));
+    rings.push(sorted.slice(taken, taken + capacity));
+    taken += capacity;
+  }
+  // Compress ring spacing when there are more rings than the canvas can hold.
+  const spread = rings.length > 1 ? Math.min(ringGap, (maxRadius - innerRadius) / (rings.length - 1)) : 0;
+
+  return rings.flatMap((ringHosts, ring) => {
+    const radius = innerRadius + ring * spread;
+    return ringHosts.map((host, position) => {
+      const angle = (position / ringHosts.length) * Math.PI * 2 - Math.PI / 2 + ring * 0.4;
+      return {
+        host,
+        x: centerX + Math.cos(angle) * radius,
+        y: centerY + Math.sin(angle) * radius,
+        size: Math.max(12, Math.round(nodeSize(host) * sizeScale)),
+      };
+    });
   });
 }
 
@@ -1367,8 +1404,47 @@ function compareIP(a: string, b: string) {
   return 0;
 }
 
+// normalizeHost guards against hosts arriving over the wire with null or
+// missing fields (JSON null for an empty Go slice, older saved scan files);
+// every view indexes open_ports directly.
+function normalizeHost(host: HostObservation): HostObservation {
+  return {
+    ...host,
+    open_ports: Array.isArray(host.open_ports) ? host.open_ports : [],
+    device_type: host.device_type || "unknown",
+  };
+}
+
+type ErrorBoundaryState = { error?: Error };
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = {};
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <main className="shell crashShell">
+          <section className="error" role="alert">
+            <strong>NetViz hit an unexpected error and stopped rendering.</strong>
+            <pre className="crashDetail">{this.state.error.message}</pre>
+            <button onClick={() => this.setState({ error: undefined })}>Try to continue</button>
+            <button onClick={() => window.location.reload()}>Reload app</button>
+          </section>
+        </main>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );
