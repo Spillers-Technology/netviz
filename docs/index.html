@@ -234,28 +234,28 @@
       <section id="views" class="band views">
         <h2>Four ways to read your network</h2>
         <p class="vlede">
-          Real scans of a real <code>/24</code> — the same hosts in the table,
-          the grouped graph, and the hierarchy map. Click any snapshot for the
-          full-size view.
+          The same monitored <code>/24</code> across every view — a precise
+          table, the grouped graph, the hierarchy map, and the history diff.
+          Click any snapshot for the full-size view.
         </p>
         <div class="shots">
           <a class="shot" href="assets/view-table.png">
             <img
               src="assets/view-table.png"
-              alt="NetViz table view listing hosts with IP, hostname, MAC, vendor, state, open ports, and device type"
+              alt="NetViz table view listing hosts with IP, hostname, MAC, vendor, monitor state, open ports, and device type"
               loading="lazy"
-              width="1648"
-              height="1069"
+              width="2160"
+              height="1440"
             />
-            <span>Table — every host, every column</span>
+            <span>Table — every host, every column, with live monitor state</span>
           </a>
           <a class="shot" href="assets/view-graph.png">
             <img
               src="assets/view-graph.png"
-              alt="NetViz graph view grouping devices by category with open-port badges and a detail panel"
+              alt="NetViz graph view grouping devices by category with open-port badges and a device detail panel"
               loading="lazy"
-              width="1663"
-              height="1072"
+              width="2160"
+              height="1440"
             />
             <span>Graph — devices grouped by category</span>
           </a>
@@ -264,10 +264,20 @@
               src="assets/view-hierarchy.png"
               alt="NetViz hierarchy view with a central firewall node, clickable device circles, and a detail panel"
               loading="lazy"
-              width="1631"
-              height="1062"
+              width="2160"
+              height="1440"
             />
             <span>Hierarchy — a /24 at a glance</span>
+          </a>
+          <a class="shot" href="assets/view-history.png">
+            <img
+              src="assets/view-history.png"
+              alt="NetViz history view listing past scan runs and diffing the two most recent scans into new, missing, and changed devices"
+              loading="lazy"
+              width="2160"
+              height="1440"
+            />
+            <span>History — saved runs and the latest diff</span>
           </a>
         </div>
         <div class="viewGrid">
@@ -380,6 +390,18 @@
               with keys; ingest is deny-by-default until one is configured.
             </p>
           </article>
+        </div>
+        <div class="shots single">
+          <a class="shot" href="assets/view-probe.png">
+            <img
+              src="assets/view-probe.png"
+              alt="NetViz desktop Probe tab: configure the CIDR, AnchorDesk URL, key, and interval, then install, start, stop, or uninstall the persistent probe service"
+              loading="lazy"
+              width="2160"
+              height="1440"
+            />
+            <span>Probe tab — provision and control the headless service from the desktop app</span>
+          </a>
         </div>
         <pre><code>docker run -p 8080:8080 -e NETVIZ_INGEST_KEY=your-key \
   -v netviz-data:/data ghcr.io/spillers-technology/netviz

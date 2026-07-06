@@ -1,5 +1,5 @@
 # NetViz
-<img width="1448" height="1086" alt="image" src="https://github.com/user-attachments/assets/3705d105-b775-4306-9368-a8ac756bec67" />
+<img width="2160" height="1440" alt="NetViz table view listing hosts with IP, hostname, MAC, vendor, monitor state, open ports, and device type" src="docs/assets/view-table.png" />
 
 **See everything on your local network — in seconds, with one download.**
 
@@ -174,6 +174,23 @@ make build-server  # netviz-server: probe ingest + web UI
 make build-probe   # netviz-probe headless scanner (see "Headless probe" above)
 make build-web     # rebuild the server web UI into internal/server/webdist
 ```
+
+### Docs screenshots
+
+The product screenshots on the [GitHub Pages site](docs/index.html) and at the
+top of this README are captured from the real desktop frontend with mocked scan
+data — no live network required. To regenerate them after a UI change:
+
+```sh
+cd desktop/frontend && npm run dev          # serve the app on 127.0.0.1:5173
+node docs/scripts/capture-desktop-media.mjs # writes docs/assets/view-*.png
+```
+
+The script injects a mock Wails bridge (Playwright `addInitScript`) and replays
+a baseline + monitor scan, so the table, graph, hierarchy, history, probe, and
+update views all render with realistic devices and monitor states. Playwright is
+loaded from `PLAYWRIGHT_NODE_MODULES` if set; see the script header for the
+one-time install hint.
 
 ### Server mode
 
