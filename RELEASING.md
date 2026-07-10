@@ -47,11 +47,13 @@ uploads:
 
 Each archive contains:
 
-- CLI binary
-- server binary
-- headless probe binary with native service management
-- desktop build output for that platform
+- desktop app at the archive root (`netviz.exe`, `netviz`, or `netviz.app`)
+- `bin/` with the CLI, server, and headless probe binaries
 - README, LICENSE, changelog, probe deployment guide, and milestone notes
+
+Windows zips are intentionally flat: after a normal "Extract All", users should
+see `netviz.exe` immediately in the extracted folder, not buried under
+`desktop/` or another app subdirectory. Keep auxiliary binaries in `bin/`.
 
 The desktop updater depends on those asset names and matching `.sha256` files.
 Before publishing a release, confirm the release includes the platform archive

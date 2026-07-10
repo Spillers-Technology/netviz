@@ -24,9 +24,9 @@ desktop app is ready to run, no toolchain required.
 
 | Platform | Download | Run |
 | --- | --- | --- |
-| **Windows** | `netviz-<version>-windows-amd64.zip` | Unzip, open `desktop/`, run **`netviz.exe`** |
-| **macOS** | `netviz-<version>-darwin-arm64.tar.gz` (Apple Silicon) or `-amd64` (Intel) | Extract, then open **`netviz.app`** |
-| **Linux** | `netviz-<version>-linux-amd64.tar.gz` | Extract, then run **`./desktop/netviz`** |
+| **Windows** | `netviz-<version>-windows-amd64.zip` | Unzip, run **`netviz.exe`** in the extracted folder |
+| **macOS** | `netviz-<version>-darwin-arm64.tar.gz` (Apple Silicon) or `-amd64` (Intel) | Extract, then open **`netviz/netviz.app`** |
+| **Linux** | `netviz-<version>-linux-amd64.tar.gz` | Extract, then run **`./netviz/netviz`** |
 
 Each archive also bundles the `netviz-cli` command-line scanner (see
 [CLI](#command-line) below) plus a SHA-256 checksum file to verify your
@@ -42,7 +42,7 @@ the first time:
 - **macOS** — Gatekeeper may say the app is from an unidentified developer.
   **Right-click `netviz.app` → Open**, then confirm. (Or `xattr -dr
   com.apple.quarantine netviz.app`.)
-- **Linux** — make sure the binary is executable: `chmod +x desktop/netviz`.
+- **Linux** — make sure the binary is executable: `chmod +x netviz/netviz`.
 
 ---
 

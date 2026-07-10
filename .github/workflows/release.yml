@@ -62,13 +62,13 @@ jobs:
       - name: Stage archive
         shell: bash
         run: |
-          mkdir -p "dist/netviz"
-          cp -R dist/bin "dist/netviz/bin"
-          mkdir -p "dist/netviz/desktop"
+          mkdir -p "dist/netviz/bin"
+          cp -R dist/bin/. "dist/netviz/bin/"
           if [ "${{ steps.meta.outputs.goos }}" = "darwin" ]; then
-            cp -R desktop/build/bin/netviz.app "dist/netviz/desktop/"
+            cp -R desktop/build/bin/netviz.app "dist/netviz/"
           else
-            cp -R desktop/build/bin/. "dist/netviz/desktop/"
+            cp desktop/build/bin/netviz "dist/netviz/netviz"
+            chmod +x "dist/netviz/netviz"
           fi
           cp README.md LICENSE CHANGELOG.md MILESTONES.md PROBE_DEPLOYMENT.md RELEASE_NOTES_v0.1.0.md RELEASE_NOTES_v0.2.0.md "dist/netviz/"
           tar -C dist -czf "${{ steps.meta.outputs.asset }}" netviz
@@ -173,11 +173,10 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist/netviz/bin | Out-Null
-          New-Item -ItemType Directory -Force dist/netviz/desktop | Out-Null
           Copy-Item dist/bin/* dist/netviz/bin/ -Recurse -Force
-          Copy-Item desktop/build/bin/* dist/netviz/desktop/ -Recurse -Force
+          Copy-Item desktop/build/bin/netviz.exe dist/netviz/netviz.exe -Force
           Copy-Item README.md,LICENSE,CHANGELOG.md,MILESTONES.md,PROBE_DEPLOYMENT.md,RELEASE_NOTES_v0.1.0.md,RELEASE_NOTES_v0.2.0.md dist/netviz/ -Force
-          Compress-Archive -Path dist/netviz -DestinationPath "${{ steps.meta.outputs.asset }}" -Force
+          Compress-Archive -Path dist/netviz/* -DestinationPath "${{ steps.meta.outputs.asset }}" -Force
           $hash = Get-FileHash "${{ steps.meta.outputs.asset }}" -Algorithm SHA256
           "$($hash.Hash.ToLowerInvariant())  ${{ steps.meta.outputs.asset }}" | Out-File "${{ steps.meta.outputs.asset }}.sha256" -Encoding ascii
       - name: Upload release asset

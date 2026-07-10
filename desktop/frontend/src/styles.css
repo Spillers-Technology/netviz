@@ -127,7 +127,7 @@ select {
   position: relative;
 }
 
-.portsPanel {
+.portsMenu > .portsPanel {
   position: absolute;
   z-index: 20;
   top: 40px;
@@ -161,7 +161,7 @@ select {
   font-size: 12px;
 }
 
-.portsPanel .field input {
+.portsMenu > .portsPanel .field input {
   width: 100%;
 }
 
@@ -289,8 +289,13 @@ button.danger:hover:not(:disabled) {
 }
 
 .runActions {
+  grid-column: 1;
+  grid-row: auto;
+  align-self: start;
+  justify-self: start;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   flex-shrink: 0;
 }
@@ -1130,11 +1135,12 @@ h4 {
 
 .historyGrid {
   display: grid;
-  grid-template-columns: minmax(280px, 420px) 1fr;
+  grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
   gap: 12px;
 }
 
 .historyPanel {
+  min-width: 0;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1155,13 +1161,17 @@ h4 {
 }
 
 .runRow {
-  align-items: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  justify-content: stretch;
+  gap: 6px 12px;
 }
 
 .runRow div:first-child {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 
 .runRow span,
@@ -1171,9 +1181,11 @@ h4 {
 }
 
 .runStats {
+  grid-column: 1;
+  grid-row: auto;
   display: flex;
   flex-wrap: wrap;
-  justify-content: end;
+  justify-content: start;
   gap: 6px;
 }
 

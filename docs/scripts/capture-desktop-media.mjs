@@ -243,16 +243,16 @@ const probeStatus = {
 };
 
 const updateInfo = {
-  current_version: "v0.9.3",
-  latest_version: "v0.9.3",
+  current_version: "v0.9.5",
+  latest_version: "v0.9.5",
   available: false,
   release_url: "https://github.com/Spillers-Technology/netviz/releases/latest",
-  asset_name: "netviz-v0.9.3-windows-amd64.zip",
-  checksum_name: "netviz-v0.9.3-windows-amd64.zip.sha256",
+  asset_name: "netviz-v0.9.5-windows-amd64.zip",
+  checksum_name: "netviz-v0.9.5-windows-amd64.zip.sha256",
   asset_url: "",
   checksum_url: "",
   download_path: "",
-  message: "NetViz is up to date (v0.9.3).",
+  message: "NetViz is up to date (v0.9.5).",
 };
 
 // Serialize the mock data into a bridge that mimics the Wails bindings. Runs in
