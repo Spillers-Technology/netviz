@@ -94,44 +94,159 @@ function App() {
       {devices.length > 0 && <NetworkMap devices={devices} cidr={cidr} />}
 
       <section className="tableWrap" aria-label="Latest device inventory">
-        {devices.length > 0 ? (
-          <table>
-            <thead>
-              <tr>
-                <th>IP</th>
-                <th>Hostname</th>
-                <th>MAC</th>
-                <th>Vendor</th>
-                <th>Status</th>
-                <th>Open ports</th>
-                <th>Device type</th>
-                <th>Last seen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {devices.map((device) => (
-                <tr key={device.ip}>
-                  <td>{device.ip}</td>
-                  <td>{device.hostname || ""}</td>
-                  <td>{device.mac_address || ""}</td>
-                  <td>{device.vendor || ""}</td>
-                  <td>
-                    <span className={`statusPill ${device.alive ? "up" : "down"}`}>
-                      {device.alive ? "up" : "down"}
-                    </span>
-                  </td>
-                  <td>{device.open_ports.map((port) => port.port).join(", ")}</td>
-                  <td>{device.device_type}</td>
-                  <td>{formatTime(device.last_updated)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <EmptyState connected={Boolean(state)} />
-        )}
+        {devices.length > 0 ? <DeviceTable devices={devices} /> : <EmptyState connected={Boolean(state)} />}
       </section>
     </main>
+  );
+}
+
+type SortKey = "ip" | "hostname" | "mac" | "vendor" | "status" | "ports" | "type" | "last_seen";
+
+const DEVICE_COLUMNS: { key: SortKey; label: string }[] = [
+  { key: "ip", label: "IP" },
+  { key: "hostname", label: "Hostname" },
+  { key: "mac", label: "MAC" },
+  { key: "vendor", label: "Vendor" },
+  { key: "status", label: "Status" },
+  { key: "ports", label: "Open ports" },
+  { key: "type", label: "Device type" },
+  { key: "last_seen", label: "Last seen" },
+];
+
+// textCompare sorts case-insensitively with blanks last, matching the
+// desktop table's behavior.
+function textCompare(a: string, b: string) {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return a.localeCompare(b, undefined, { sensitivity: "base" });
+}
+
+function compareIP(a: string, b: string) {
+  const left = a.split(".").map(Number);
+  const right = b.split(".").map(Number);
+  for (let i = 0; i < 4; i += 1) {
+    if (left[i] !== right[i]) return left[i] - right[i];
+  }
+  return 0;
+}
+
+function compareDevices(a: Device, b: Device, key: SortKey) {
+  switch (key) {
+    case "hostname":
+      return textCompare(a.hostname || "", b.hostname || "");
+    case "mac":
+      return textCompare(a.mac_address || "", b.mac_address || "");
+    case "vendor":
+      return textCompare(a.vendor || "", b.vendor || "");
+    case "status":
+      return (b.alive ? 1 : 0) - (a.alive ? 1 : 0);
+    case "ports":
+      return b.open_ports.length - a.open_ports.length;
+    case "type":
+      return textCompare(a.device_type, b.device_type);
+    case "last_seen":
+      return Date.parse(a.last_updated || "") - Date.parse(b.last_updated || "");
+    default:
+      return 0;
+  }
+}
+
+function DeviceTable({ devices }: { devices: Device[] }) {
+  const [filter, setFilter] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("ip");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const visible = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    const filtered = needle
+      ? devices.filter((device) =>
+          [
+            device.ip,
+            device.hostname || "",
+            device.mac_address || "",
+            device.vendor || "",
+            device.device_type,
+            device.alive ? "up" : "down",
+            device.open_ports.map((port) => `${port.port} ${port.service}`).join(" "),
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(needle)
+        )
+      : devices;
+    return [...filtered].sort((a, b) => {
+      const order = compareDevices(a, b, sortKey) || compareIP(a.ip, b.ip);
+      return sortAsc ? order : -order;
+    });
+  }, [devices, filter, sortKey, sortAsc]);
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortAsc((asc) => !asc);
+    } else {
+      setSortKey(key);
+      setSortAsc(true);
+    }
+  }
+
+  return (
+    <>
+      <div className="tableTools">
+        <input
+          className="tableFilter"
+          type="search"
+          placeholder="Filter by IP, hostname, MAC, vendor, port…"
+          aria-label="Filter devices"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+        />
+        {filter.trim() && (
+          <span className="quiet">
+            {visible.length} of {devices.length} match
+          </span>
+        )}
+      </div>
+      <table>
+        <thead>
+          <tr>
+            {DEVICE_COLUMNS.map((column) => (
+              <th key={column.key} aria-sort={sortKey === column.key ? (sortAsc ? "ascending" : "descending") : undefined}>
+                <button type="button" className="sortHeader" onClick={() => toggleSort(column.key)}>
+                  {column.label}
+                  {sortKey === column.key && <span className="sortArrow" aria-hidden="true">{sortAsc ? "▲" : "▼"}</span>}
+                </button>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map((device) => (
+            <tr key={device.ip}>
+              <td>{device.ip}</td>
+              <td>{device.hostname || ""}</td>
+              <td>{device.mac_address || ""}</td>
+              <td>{device.vendor || ""}</td>
+              <td>
+                <span className={`statusPill ${device.alive ? "up" : "down"}`}>
+                  {device.alive ? "up" : "down"}
+                </span>
+              </td>
+              <td>{device.open_ports.map((port) => port.port).join(", ")}</td>
+              <td>{device.device_type}</td>
+              <td>{formatTime(device.last_updated)}</td>
+            </tr>
+          ))}
+          {visible.length === 0 && (
+            <tr>
+              <td className="empty" colSpan={8}>
+                No devices match the filter.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </>
   );
 }
 

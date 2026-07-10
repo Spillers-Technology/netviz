@@ -43,16 +43,33 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
+select {
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+/* Flex instead of fixed grid rows: the update banner and the error stack add
+   a variable number of children, and a fixed template handed the 1fr row to
+   whatever happened to land fifth. The last child (the active view) grows. */
 .shell {
   min-height: 100vh;
-  display: grid;
-  grid-template-rows: auto auto auto auto 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   padding: 14px;
+}
+
+.shell > :last-child {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .toolbar,
@@ -158,6 +175,19 @@ button.primary:hover:not(:disabled),
   background: var(--blue-strong);
 }
 
+/* A disabled primary must not keep its full-strength blue: it read as the
+   next action even when it could not be clicked. */
+button.primary:disabled {
+  background: #9db8d2;
+  border-color: #9db8d2;
+  color: #f4f7fa;
+}
+
+input.invalid:not(:disabled) {
+  border-color: #c50f1f;
+  background: #fdf3f4;
+}
+
 .status {
   display: flex;
   flex-wrap: wrap;
@@ -171,6 +201,21 @@ button.primary:hover:not(:disabled),
   display: flex;
   gap: 6px;
   padding: 8px;
+}
+
+.progressTrack {
+  flex-basis: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: #dbe3ec;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--blue);
+  transition: width 0.3s ease;
 }
 
 .error {
@@ -267,6 +312,102 @@ th {
   color: #1a242e;
   font-weight: 600;
   box-shadow: inset 0 -2px 0 var(--border-strong);
+}
+
+.tableLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.tableLayout.withDetail {
+  grid-template-columns: minmax(0, 1fr) 340px;
+}
+
+.tableLayout > * {
+  min-height: 0;
+}
+
+.tableLayout > .detailPanel {
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  overflow: auto;
+}
+
+tbody tr.hostRow {
+  cursor: pointer;
+}
+
+tbody tr.hostRow:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+tbody tr.hostRow.selected td {
+  background: var(--blue-soft);
+}
+
+.detailTitle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detailTitle h2 {
+  margin: 0;
+}
+
+.detailClose {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 9px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+.tableTools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #ccd4dd;
+}
+
+.tableTools .quiet {
+  font-size: 13px;
+}
+
+input.tableFilter {
+  width: 300px;
+}
+
+th .sortHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  white-space: nowrap;
+}
+
+th .sortHeader:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--blue);
+}
+
+.sortArrow {
+  font-size: 9px;
+  color: var(--blue);
 }
 
 tbody tr:nth-child(even) td {

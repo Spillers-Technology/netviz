@@ -149,7 +149,15 @@ func (s *SQLiteStore) HostsForRun(ctx context.Context, runID string) ([]model.Ho
 		}
 		hosts = append(hosts, host)
 	}
-	return hosts, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// The SQL ORDER BY compares IPs as text (10.0.0.10 before 10.0.0.2);
+	// re-sort numerically so every consumer lists addresses in scan order.
+	sort.Slice(hosts, func(i, j int) bool {
+		return model.LessIP(hosts[i].IP, hosts[j].IP)
+	})
+	return hosts, nil
 }
 
 // SaveScanRunCoalesced stores the run unless its host set is equivalent to
