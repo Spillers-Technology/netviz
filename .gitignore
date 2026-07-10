@@ -1,7 +1,7 @@
 .DS_Store
 bin/
 dist/
-build/
+/build/
 coverage.out
 *.log
 
@@ -13,7 +13,11 @@ node_modules/
 npm-debug.log*
 
 # Wails
-desktop/build/
+desktop/build/*
+!desktop/build/appicon.png
+!desktop/build/windows/
+desktop/build/windows/*
+!desktop/build/windows/icon.ico
 desktop/frontend/dist/
 desktop/frontend/wailsjs/
 desktop/frontend/package.json.md5

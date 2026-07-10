@@ -243,16 +243,16 @@ const probeStatus = {
 };
 
 const updateInfo = {
-  current_version: "v0.9.3",
-  latest_version: "v0.9.3",
+  current_version: "v0.9.5",
+  latest_version: "v0.9.5",
   available: false,
   release_url: "https://github.com/Spillers-Technology/netviz/releases/latest",
-  asset_name: "netviz-v0.9.3-windows-amd64.zip",
-  checksum_name: "netviz-v0.9.3-windows-amd64.zip.sha256",
+  asset_name: "netviz-v0.9.5-windows-amd64.zip",
+  checksum_name: "netviz-v0.9.5-windows-amd64.zip.sha256",
   asset_url: "",
   checksum_url: "",
   download_path: "",
-  message: "NetViz is up to date (v0.9.3).",
+  message: "NetViz is up to date (v0.9.5).",
 };
 
 // Serialize the mock data into a bridge that mimics the Wails bindings. Runs in
@@ -269,6 +269,9 @@ function bridgeInitScript(payload) {
     const app = {
       StartScan: async () => {}, StartMonitorScan: async () => {}, CancelScan: async () => {},
       SaveScanFile: async () => {}, OpenScanFile: async () => null, SaveCSVFile: async () => {},
+      DefaultPorts: async () => data.defaultPorts,
+      DiffRuns: async () => data.latestDiff,
+      DeleteRun: async () => {},
       ListHistory: async () => data.historyRuns,
       LatestDiff: async () => data.latestDiff,
       HostHistory: async (ip) => data.hostHistory[ip] || [],
@@ -346,7 +349,14 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
   const { chromium } = loadPlaywright();
 
-  const payload = { historyRuns, latestDiff, hostHistory: buildHostHistory(), probeStatus, updateInfo };
+  const defaultPorts = [
+    [21, "ftp"], [22, "ssh"], [23, "telnet"], [53, "dns"], [80, "http"], [135, "msrpc"],
+    [139, "netbios"], [443, "https"], [445, "smb"], [515, "lpd"], [554, "rtsp"], [631, "ipp"],
+    [1883, "mqtt"], [3389, "rdp"], [5900, "vnc"], [8000, "http-alt"], [8080, "http-alt"],
+    [8123, "home-assistant"], [8443, "https-alt"], [8888, "http-alt"], [9100, "jetdirect"], [32400, "plex"],
+  ].map(([p, service]) => port(p, service));
+
+  const payload = { historyRuns, latestDiff, hostHistory: buildHostHistory(), probeStatus, updateInfo, defaultPorts };
 
   let browser;
   try {

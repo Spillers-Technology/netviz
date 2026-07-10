@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.9.5 — 2026-07-10
+
+Release-readiness pass for the v0.9 desktop build.
+
+Added:
+
+- Branded desktop icon staging: Wails now has tracked `appicon.png` and
+  Windows `icon.ico` assets so release builds embed the NetViz icon by
+  default.
+- CLI regression tests for the `-ports` flag: parsing, duplicate handling,
+  limit enforcement, usage text, and TCP range validation.
+
+Changed:
+
+- Windows release archives now put `netviz.exe` at the top level, with CLI,
+  server, and probe helpers in `bin/`, so users do not have to dig through a
+  `desktop/` folder to start the app.
+- Linux/macOS release archives follow the same intent: the desktop app sits at
+  the package root and helper tools live in `bin/`.
+- The desktop updater can extract the new root-level app layout while still
+  accepting older `desktop/` archives.
+- Release docs, README, and the GitHub Pages download copy now describe the
+  new archive layout.
+
+Fixed:
+
+- The Ports toolbar dropdown shared a CSS class with the device detail "Open
+  ports" panel, causing the detail panel to overlap the tab bar after a row was
+  selected. The dropdown styles are now scoped to the toolbar menu.
+- History run actions could be visually present but unclickable after an A/B
+  comparison because the diff panel overlapped the run row. Run rows now stay
+  inside their grid column.
+
 ## v0.9.4 — 2026-07-09
 
 UX and engineering pass over the desktop app and CLI.
@@ -21,6 +54,12 @@ Added:
 - A progress bar in the status strip while a scan is running.
 - `netviz-cli version` and `netviz-cli help` (unknown usage now points at
   help instead of failing with only "CIDR is required").
+- Port selection: a Ports menu in the toolbar toggles the default LAN ports
+  and accepts extra ports (max 64 per scan, persisted); the CLI gained a
+  matching `-ports 22,80,443` flag. Scans stay constrained — this is a
+  bounded picker, not an arbitrary sweep.
+- History management: any two stored runs can be compared (pick A and B in
+  the runs list), and runs can be deleted with a confirm step.
 
 Changed:
 

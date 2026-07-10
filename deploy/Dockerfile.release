@@ -40,12 +40,11 @@ RUN mkdir -p /stage/linux/netviz/bin /stage/windows/netviz/bin \
 RUN npm ci --prefix desktop/frontend && npm run --prefix desktop/frontend build
 
 RUN cd desktop && wails build \
-    && mkdir -p /stage/linux/netviz/desktop \
-    && cp -R build/bin/. /stage/linux/netviz/desktop/
+    && cp build/bin/netviz /stage/linux/netviz/netviz \
+    && chmod +x /stage/linux/netviz/netviz
 
 RUN cd desktop && wails build -platform windows/amd64 \
-    && mkdir -p /stage/windows/netviz/desktop \
-    && cp build/bin/netviz.exe /stage/windows/netviz/desktop/
+    && cp build/bin/netviz.exe /stage/windows/netviz/netviz.exe
 
 # Docs + archives + checksums, same layout and names as release.yml.
 RUN for d in /stage/linux/netviz /stage/windows/netviz; do \
@@ -54,6 +53,6 @@ RUN for d in /stage/linux/netviz /stage/windows/netviz; do \
     done \
     && mkdir -p /out \
     && tar -C /stage/linux -czf "/out/netviz-${TAG}-linux-amd64.tar.gz" netviz \
-    && (cd /stage/windows && zip -qr "/out/netviz-${TAG}-windows-amd64.zip" netviz) \
+    && (cd /stage/windows/netviz && zip -qr "/out/netviz-${TAG}-windows-amd64.zip" .) \
     && cd /out \
     && for f in *; do sha256sum "$f" > "$f.sha256"; done

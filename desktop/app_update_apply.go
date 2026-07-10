@@ -72,7 +72,8 @@ func (a *App) ApplyDownloadedUpdate(archivePath string) (string, error) {
 }
 
 // extractDesktopBinary finds the desktop executable inside a release archive
-// (zip or tar.gz, laid out as netviz/desktop/<name>) and writes it to dest.
+// and writes it to dest. Current archives put the desktop app at the package
+// root for easier manual installs; older archives used netviz/desktop/<name>.
 func extractDesktopBinary(archivePath string, binaryName string, dest string) error {
 	var reader io.ReadCloser
 	var err error
@@ -108,7 +109,16 @@ func extractDesktopBinary(archivePath string, binaryName string, dest string) er
 
 func isDesktopEntry(name string, binaryName string) bool {
 	name = strings.ReplaceAll(name, "\\", "/")
-	return filepath.Base(name) == binaryName && strings.Contains(name, "/desktop/")
+	if filepath.Base(name) != binaryName {
+		return false
+	}
+	parts := strings.Split(strings.Trim(name, "/"), "/")
+	for _, part := range parts[:len(parts)-1] {
+		if part == "desktop" {
+			return true
+		}
+	}
+	return len(parts) == 1 || (len(parts) == 2 && parts[0] == "netviz")
 }
 
 func openZipEntry(archivePath string, binaryName string) (io.ReadCloser, error) {
@@ -127,7 +137,7 @@ func openZipEntry(archivePath string, binaryName string) (io.ReadCloser, error) 
 		}
 	}
 	archive.Close()
-	return nil, fmt.Errorf("archive does not contain desktop/%s", binaryName)
+	return nil, fmt.Errorf("archive does not contain desktop binary %s", binaryName)
 }
 
 func openTarEntry(archivePath string, binaryName string) (io.ReadCloser, error) {
@@ -157,7 +167,7 @@ func openTarEntry(archivePath string, binaryName string) (io.ReadCloser, error) 
 	}
 	unzipped.Close()
 	file.Close()
-	return nil, fmt.Errorf("archive does not contain desktop/%s", binaryName)
+	return nil, fmt.Errorf("archive does not contain desktop binary %s", binaryName)
 }
 
 type closerChain struct {

@@ -305,6 +305,31 @@ func (s *SQLiteStore) PruneScanRuns(ctx context.Context, keep int) (int, error) 
 	return int(removed), tx.Commit()
 }
 
+// DeleteScanRun removes one stored run and its host observations.
+func (s *SQLiteStore) DeleteScanRun(ctx context.Context, runID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM host_observations WHERE run_id = ?`, runID); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM scan_runs WHERE id = ?`, runID)
+	if err != nil {
+		return err
+	}
+	removed, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if removed == 0 {
+		return fmt.Errorf("scan run %q not found", runID)
+	}
+	return tx.Commit()
+}
+
 func (s *SQLiteStore) DiffLatest(ctx context.Context) (*model.ScanDiff, error) {
 	runs, err := s.ListScanRuns(ctx, 2)
 	if err != nil {
@@ -519,7 +544,7 @@ func samePorts(a []model.PortObservation, b []model.PortObservation) bool {
 
 func sortHosts(hosts []model.HostObservation) {
 	sort.Slice(hosts, func(i, j int) bool {
-		return hosts[i].IP < hosts[j].IP
+		return model.LessIP(hosts[i].IP, hosts[j].IP)
 	})
 }
 
