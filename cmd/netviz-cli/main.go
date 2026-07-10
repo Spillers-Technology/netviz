@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/Spillers-Technology/netviz/internal/model"
 	"github.com/Spillers-Technology/netviz/internal/scanner"
 	"github.com/Spillers-Technology/netviz/internal/storage"
+	"github.com/Spillers-Technology/netviz/internal/version"
 )
 
 func main() {
@@ -34,9 +36,29 @@ func run() error {
 			return runHistory(os.Args[2:])
 		case "diff":
 			return runDiff(os.Args[2:])
+		case "version", "-version", "--version":
+			fmt.Println("netviz-cli " + version.Version)
+			return nil
+		case "help", "-h", "--help":
+			printUsage(os.Stdout)
+			return nil
 		}
 	}
 	return runScan(os.Args[1:])
+}
+
+func printUsage(w io.Writer) {
+	fmt.Fprint(w, `netviz-cli — NetViz LAN scanner
+
+Usage:
+  netviz-cli scan -cidr 192.168.1.0/24 [-save]   scan a network, stream JSON events
+  netviz-cli history [-limit 20]                 list saved scan runs
+  netviz-cli diff [-base ID -compare ID]         diff two runs (default: latest two)
+  netviz-cli version                             print the version
+
+A bare CIDR also works: netviz-cli 192.168.1.0/24
+Only scan networks you own or are authorized to scan.
+`)
 }
 
 func runScan(args []string) error {
@@ -52,7 +74,7 @@ func runScan(args []string) error {
 		cidr = flags.Arg(0)
 	}
 	if cidr == "" {
-		return errors.New("CIDR is required; use -cidr 192.168.1.0/24")
+		return errors.New("CIDR is required; use -cidr 192.168.1.0/24 (netviz-cli help lists all commands)")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -162,7 +184,7 @@ func hostsFromMap(results map[string]model.HostObservation) []model.HostObservat
 		hosts = append(hosts, host)
 	}
 	sort.Slice(hosts, func(i, j int) bool {
-		return hosts[i].IP < hosts[j].IP
+		return model.LessIP(hosts[i].IP, hosts[j].IP)
 	})
 	return hosts
 }

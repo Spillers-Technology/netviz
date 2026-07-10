@@ -187,6 +187,58 @@ th {
   box-shadow: inset 0 -2px 0 var(--border-strong);
 }
 
+.tableTools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #ccd4dd;
+}
+
+.tableTools .quiet {
+  font-size: 13px;
+}
+
+input.tableFilter {
+  width: 300px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #ffffff;
+  font: inherit;
+}
+
+th .sortHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+th .sortHeader:hover {
+  color: var(--blue, #0b5cab);
+}
+
+.sortArrow {
+  font-size: 9px;
+  color: var(--blue, #0b5cab);
+}
+
+td.empty {
+  height: 120px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 tbody tr:nth-child(even) td {
   background: #f6f8fb;
 }

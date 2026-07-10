@@ -344,7 +344,7 @@ func (a *App) snapshotHosts() []model.HostObservation {
 		hosts = append(hosts, host)
 	}
 	sort.Slice(hosts, func(i, j int) bool {
-		return hosts[i].IP < hosts[j].IP
+		return model.LessIP(hosts[i].IP, hosts[j].IP)
 	})
 	return hosts
 }

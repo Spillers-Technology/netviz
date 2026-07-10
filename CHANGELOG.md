@@ -1,5 +1,53 @@
 # Changelog
 
+## v0.9.4 — 2026-07-09
+
+UX and engineering pass over the desktop app and CLI.
+
+Added:
+
+- Table view: sortable columns (numeric IP order, port count, dates) and a
+  text filter across IP, hostname, MAC, vendor, device type, state, and
+  ports, with a match counter.
+- Table rows are clickable (mouse or keyboard): selecting a row opens the
+  same device detail panel — ports, enrichment, per-device history — that
+  the Graph and Hierarchy views already had.
+- Monitor interval control (15s/30s/1m/5m) next to the Monitor button; the
+  choice persists across restarts, as does the last-used CIDR.
+- The server web UI's device table gained the same column sorting and text
+  filter as the desktop table.
+- Live CIDR validation in the toolbar: an invalid CIDR marks the field and
+  disables Start Scan/Monitor instead of erroring after the click.
+- A progress bar in the status strip while a scan is running.
+- `netviz-cli version` and `netviz-cli help` (unknown usage now points at
+  help instead of failing with only "CIDR is required").
+
+Changed:
+
+- Timestamps no longer drop the date: a device first seen last week reads
+  "Jul 2 9:12 AM", not a bare time that looks like this morning.
+- "Show checked-only" is now "Show unresponsive"; the status strip says
+  "N unresponsive hidden" and the idle state reads "idle".
+- Exports and saved history sort addresses numerically (10.0.0.2 before
+  10.0.0.10) via a shared `model.LessIP` helper.
+
+Changed (internal):
+
+- Errors now stack as individually dismissible alerts instead of a single
+  slot where each new error silently replaced the previous one.
+- Scan event handling no longer nests state updates inside a React updater
+  (StrictMode-safe), tracking previous observations in a ref instead.
+
+Fixed:
+
+- Disabled primary buttons (e.g. "Install and Restart" before a download)
+  kept their full-strength blue and looked clickable; they now render muted.
+- The storage layer ordered a run's hosts by textual IP, so the server web
+  UI and diffs listed 10.0.0.10 before 10.0.0.2; it now sorts numerically.
+- The app shell used a fixed grid template, so with the update banner plus
+  an error visible the main view could lose its flexible row; the shell is
+  now a column flexbox.
+
 ## v0.9.3 — 2026-07-02
 
 Documentation sync for the v0.9 series.

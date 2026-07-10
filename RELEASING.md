@@ -61,6 +61,12 @@ for that exact archive.
 The workflow also supports manual dispatch with a `tag` input to rebuild assets
 for an existing release.
 
+When self-hosted runners are unavailable, `deploy/Dockerfile.release` builds
+the Linux and Windows archives (plus `.sha256` files) from any Docker host —
+usage is documented at the top of that file. Every release must ship its
+platform archives; do not publish a release without them. macOS archives still
+require a Mac.
+
 ## Release Checklist (every release)
 
 Code health:

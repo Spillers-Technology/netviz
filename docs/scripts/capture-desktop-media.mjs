@@ -375,7 +375,16 @@ async function main() {
     await page.waitForTimeout(500);
 
     const shots = [
-      { tab: "Table", file: "view-table.png", ready: () => page.locator("table tbody tr").nth(3).waitFor() },
+      {
+        tab: "Table",
+        file: "view-table.png",
+        ready: () => page.locator("table tbody tr").nth(3).waitFor(),
+        // Select a device so the screenshot shows the table's detail panel.
+        after: async () => {
+          await page.locator("tbody tr", { hasText: "192.168.1.42" }).click();
+          await page.locator(".tableLayout .detailPanel").waitFor();
+        },
+      },
       { tab: "Graph", file: "view-graph.png", ready: () => page.locator(".deviceNode").first().waitFor() },
       { tab: "Hierarchy", file: "view-hierarchy.png", ready: () => page.locator(".circleNode").first().waitFor() },
       { tab: "History", file: "view-history.png", ready: () => page.getByText("Latest diff", { exact: false }).waitFor() },
@@ -387,6 +396,7 @@ async function main() {
       console.log(`Rendering ${shot.tab}...`);
       await selectTab(page, shot.tab);
       await shot.ready();
+      if (shot.after) await shot.after();
       await page.waitForTimeout(250);
       await page.screenshot({ path: path.join(outDir, shot.file) });
     }

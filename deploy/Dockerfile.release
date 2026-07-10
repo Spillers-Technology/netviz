@@ -1,0 +1,59 @@
+# Builds NetViz release artifacts without self-hosted runners: Linux binaries
+# and desktop natively, Windows binaries and desktop cross-compiled (Wails
+# Windows builds are CGO-free). Archives land in /out with sha256 files, in
+# the exact layout release.yml produces.
+#
+#   git worktree add /tmp/netviz-vX.Y.Z vX.Y.Z
+#   docker build -f deploy/Dockerfile.release --build-arg TAG=vX.Y.Z -t netviz-release /tmp/netviz-vX.Y.Z
+#   docker create --name nvrel netviz-release && docker cp nvrel:/out ./out && docker rm nvrel
+#   gh release upload vX.Y.Z out/*
+#
+# macOS assets still need a Mac; Wails cannot cross-compile darwin.
+FROM golang:1.25-bookworm
+
+ARG TAG=dev
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl zip build-essential pkg-config \
+        libgtk-3-dev libwebkit2gtk-4.0-dev \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+ENV PATH="/root/go/bin:${PATH}"
+
+WORKDIR /src
+COPY . .
+
+# Headless Go binaries, matching the release workflow (plain go build; the
+# sqlite driver is pure Go so CGO stays off for these).
+RUN mkdir -p /stage/linux/netviz/bin /stage/windows/netviz/bin \
+    && CGO_ENABLED=0 go build -o /stage/linux/netviz/bin/netviz-cli ./cmd/netviz-cli \
+    && CGO_ENABLED=0 go build -o /stage/linux/netviz/bin/netviz-server ./cmd/netviz-server \
+    && CGO_ENABLED=0 go build -o /stage/linux/netviz/bin/netviz-probe ./cmd/netviz-probe \
+    && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /stage/windows/netviz/bin/netviz-cli.exe ./cmd/netviz-cli \
+    && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /stage/windows/netviz/bin/netviz-server.exe ./cmd/netviz-server \
+    && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /stage/windows/netviz/bin/netviz-probe.exe ./cmd/netviz-probe
+
+# Desktop frontend once, then Wails builds: native Linux, then Windows cross.
+RUN npm ci --prefix desktop/frontend && npm run --prefix desktop/frontend build
+
+RUN cd desktop && wails build \
+    && mkdir -p /stage/linux/netviz/desktop \
+    && cp -R build/bin/. /stage/linux/netviz/desktop/
+
+RUN cd desktop && wails build -platform windows/amd64 \
+    && mkdir -p /stage/windows/netviz/desktop \
+    && cp build/bin/netviz.exe /stage/windows/netviz/desktop/
+
+# Docs + archives + checksums, same layout and names as release.yml.
+RUN for d in /stage/linux/netviz /stage/windows/netviz; do \
+        cp README.md LICENSE CHANGELOG.md MILESTONES.md PROBE_DEPLOYMENT.md \
+           RELEASE_NOTES_v0.1.0.md RELEASE_NOTES_v0.2.0.md "$d/"; \
+    done \
+    && mkdir -p /out \
+    && tar -C /stage/linux -czf "/out/netviz-${TAG}-linux-amd64.tar.gz" netviz \
+    && (cd /stage/windows && zip -qr "/out/netviz-${TAG}-windows-amd64.zip" netviz) \
+    && cd /out \
+    && for f in *; do sha256sum "$f" > "$f.sha256"; done

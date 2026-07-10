@@ -141,8 +141,33 @@ declare global {
   }
 }
 
+type AppError = { id: number; text: string };
+
+const MONITOR_INTERVALS = [
+  { label: "15s", ms: 15_000 },
+  { label: "30s", ms: 30_000 },
+  { label: "1m", ms: 60_000 },
+  { label: "5m", ms: 300_000 },
+];
+
+function readSetting(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSetting(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Settings persistence is best-effort; never let it break the app.
+  }
+}
+
 function App() {
-  const [cidr, setCidr] = useState("192.168.1.0/24");
+  const [cidr, setCidr] = useState(() => readSetting("netviz.cidr") || "192.168.1.0/24");
   const [hosts, setHosts] = useState<Record<string, HostObservation>>({});
   const [deviceStates, setDeviceStates] = useState<Record<string, DeviceState>>({});
   const [history, setHistory] = useState<ScanRun[]>([]);
@@ -154,7 +179,11 @@ function App() {
   const [fileOpen, setFileOpen] = useState(false);
   const [checkedHosts, setCheckedHosts] = useState(0);
   const [totalHosts, setTotalHosts] = useState(0);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<AppError[]>([]);
+  const [monitorMs, setMonitorMs] = useState(() => {
+    const saved = Number(readSetting("netviz.monitorMs"));
+    return MONITOR_INTERVALS.some((interval) => interval.ms === saved) ? saved : 15_000;
+  });
   const [probeURL, setProbeURL] = useState("");
   const [probeKey, setProbeKey] = useState("");
   const [probeInterval, setProbeInterval] = useState("1m");
@@ -189,10 +218,36 @@ function App() {
   const monitoringRef = useRef(false);
   const scanningRef = useRef(false);
   const cidrRef = useRef(cidr);
+  // Mirror of the hosts state, so event handlers can read the previous
+  // observation without doing work inside a React state updater.
+  const hostsRef = useRef<Record<string, HostObservation>>({});
+  const errorSeq = useRef(0);
+
+  function pushError(err: unknown) {
+    const text = err instanceof Error ? err.message : String(err);
+    if (!text) return;
+    setErrors((current) => {
+      if (current.some((item) => item.text === text)) return current;
+      errorSeq.current += 1;
+      return [...current.slice(-3), { id: errorSeq.current, text }];
+    });
+  }
+
+  function dismissError(id: number) {
+    setErrors((current) => current.filter((item) => item.id !== id));
+  }
 
   useEffect(() => {
     monitoringRef.current = monitoring;
   }, [monitoring]);
+
+  useEffect(() => {
+    writeSetting("netviz.cidr", cidr);
+  }, [cidr]);
+
+  useEffect(() => {
+    writeSetting("netviz.monitorMs", String(monitorMs));
+  }, [monitorMs]);
 
   useEffect(() => {
     scanningRef.current = scanning;
@@ -233,7 +288,7 @@ function App() {
       refreshHistory();
     });
     const offHistoryError = window.runtime?.EventsOn("history:error", (payload) => {
-      setError(String(payload));
+      pushError(payload);
     });
     const offLoaded = window.runtime?.EventsOn("scan:loaded", (payload) => {
       loadHosts((payload as HostObservation[]) || []);
@@ -255,6 +310,7 @@ function App() {
     return rows.filter((host) => shouldShowHost(host, deviceStates[host.ip], showCheckedOnly));
   }, [rows, deviceStates, showCheckedOnly]);
 
+  const cidrValid = isValidCIDR(cidr);
   const aliveRows = rows.filter((host) => host.alive);
   const openPortsFound = rows.reduce((sum, host) => sum + host.open_ports.length, 0);
   const offlineCount = Object.values(deviceStates).filter((state) => state === "offline").length;
@@ -264,9 +320,9 @@ function App() {
     if (!monitoring || scanning) return;
     const timer = window.setTimeout(() => {
       void startScan(true, true);
-    }, rows.length === 0 ? 100 : 15000);
+    }, rows.length === 0 ? 100 : monitorMs);
     return () => window.clearTimeout(timer);
-  }, [monitoring, scanning, rows.length]);
+  }, [monitoring, scanning, rows.length, monitorMs]);
 
   async function refreshHistory() {
     const app = window.go?.main?.App;
@@ -276,7 +332,7 @@ function App() {
       setHistory(runs || []);
       setDiff(latestDiff || { base_run_id: "", compare_run_id: "" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     }
   }
 
@@ -296,7 +352,7 @@ function App() {
         setProbeInterval(status.config.interval || "1m");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     }
   }
 
@@ -304,13 +360,13 @@ function App() {
     const app = window.go?.main?.App;
     if (!app) return;
     setUpdateBusy(true);
-    if (showErrors) setError("");
+    if (showErrors) setErrors([]);
     try {
       const info = await app.CheckForUpdate();
       setUpdateInfo(info);
     } catch (err) {
       if (showErrors) {
-        setError(err instanceof Error ? err.message : String(err));
+        pushError(err);
       }
     } finally {
       setUpdateBusy(false);
@@ -320,20 +376,16 @@ function App() {
   function applyHostEvent(event: ScanEvent) {
     if (!event.host) return;
     const incoming = normalizeHost(event.host);
-    setHosts((current) => {
-      const previous = current[incoming.ip];
-      if (monitoringRef.current && event.type === "host_seen" && previous) {
-        return current;
-      }
-
-      const nextHost = incoming;
-      const next = { ...current, [nextHost.ip]: nextHost };
-      if (event.type === "host_done" || event.type === "host_enriched" || event.type === "port_open" || event.type === "device_classified") {
-        const state = classifyTransition(previous, nextHost);
-        setDeviceStates((states) => ({ ...states, [nextHost.ip]: state }));
-      }
-      return next;
-    });
+    const previous = hostsRef.current[incoming.ip];
+    if (monitoringRef.current && event.type === "host_seen" && previous) {
+      return;
+    }
+    hostsRef.current = { ...hostsRef.current, [incoming.ip]: incoming };
+    setHosts(hostsRef.current);
+    if (event.type === "host_done" || event.type === "host_enriched" || event.type === "port_open" || event.type === "device_classified") {
+      const state = classifyTransition(previous, incoming);
+      setDeviceStates((states) => ({ ...states, [incoming.ip]: state }));
+    }
   }
 
   function loadHosts(opened: HostObservation[]) {
@@ -341,6 +393,7 @@ function App() {
     for (const host of opened) {
       nextHosts[host.ip] = normalizeHost(host);
     }
+    hostsRef.current = nextHosts;
     setHosts(nextHosts);
     setDeviceStates({});
     setCheckedHosts(0);
@@ -348,8 +401,9 @@ function App() {
   }
 
   async function startScan(preserve = false, fromMonitor = false) {
-    setError("");
+    setErrors([]);
     if (!preserve) {
+      hostsRef.current = {};
       setHosts({});
       setDeviceStates({});
     }
@@ -367,7 +421,7 @@ function App() {
       setScanning(false);
       scanningRef.current = false;
       if (fromMonitor && !monitoringRef.current) return;
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     }
   }
 
@@ -388,59 +442,59 @@ function App() {
   async function saveScan() {
     const app = window.go?.main?.App;
     if (!app) return;
-    setError("");
+    setErrors([]);
     setFileOpen(false);
     try {
       await app.SaveScanFile();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     }
   }
 
   async function openScan() {
     const app = window.go?.main?.App;
     if (!app) return;
-    setError("");
+    setErrors([]);
     setFileOpen(false);
     try {
       const opened = await app.OpenScanFile();
       if (!opened) return;
       loadHosts(opened);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     }
   }
 
   async function saveCSV() {
     const app = window.go?.main?.App;
     if (!app) return;
-    setError("");
+    setErrors([]);
     setFileOpen(false);
     try {
       await app.SaveCSVFile();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     }
   }
 
   async function chooseProbeBinary() {
     const app = window.go?.main?.App;
     if (!app) return;
-    setError("");
+    setErrors([]);
     try {
       const chosen = await app.ChooseProbeBinary();
       if (!chosen) return;
       setProbePath(chosen);
       await refreshProbeStatus(chosen);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     }
   }
 
   async function provisionProbe() {
     const app = window.go?.main?.App;
     if (!app) return;
-    setError("");
+    setErrors([]);
     setProbeBusy(true);
     try {
       const status = await app.ProvisionProbe({
@@ -457,7 +511,7 @@ function App() {
         setProbePath(status.probe_path);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     } finally {
       setProbeBusy(false);
     }
@@ -466,7 +520,7 @@ function App() {
   async function probeAction(action: string) {
     const app = window.go?.main?.App;
     if (!app) return;
-    setError("");
+    setErrors([]);
     setProbeBusy(true);
     try {
       const status = await app.ProbeServiceAction(action, probePath);
@@ -475,7 +529,7 @@ function App() {
         setProbePath(status.probe_path);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     } finally {
       setProbeBusy(false);
     }
@@ -484,13 +538,13 @@ function App() {
   async function downloadUpdate() {
     const app = window.go?.main?.App;
     if (!app) return;
-    setError("");
+    setErrors([]);
     setUpdateBusy(true);
     try {
       const info = await app.DownloadLatestUpdate();
       setUpdateInfo(info);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     } finally {
       setUpdateBusy(false);
     }
@@ -499,24 +553,24 @@ function App() {
   async function openUpdateDownload() {
     const app = window.go?.main?.App;
     if (!app || !updateInfo.download_path) return;
-    setError("");
+    setErrors([]);
     try {
       await app.OpenUpdateDownload(updateInfo.download_path);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     }
   }
 
   async function applyUpdate() {
     const app = window.go?.main?.App;
     if (!app || !updateInfo.download_path) return;
-    setError("");
+    setErrors([]);
     setUpdateBusy(true);
     try {
       const message = await app.ApplyDownloadedUpdate(updateInfo.download_path);
       setUpdateInfo((info) => ({ ...info, message }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      pushError(err);
     } finally {
       setUpdateBusy(false);
     }
@@ -542,32 +596,70 @@ function App() {
         </div>
         <label className="field">
           <span>CIDR</span>
-          <input value={cidr} onChange={(event) => setCidr(event.target.value)} disabled={scanning} />
+          <input
+            value={cidr}
+            onChange={(event) => setCidr(event.target.value)}
+            disabled={scanning}
+            className={cidrValid ? "" : "invalid"}
+            aria-invalid={!cidrValid}
+            title={cidrValid ? undefined : "Enter an IPv4 CIDR such as 192.168.1.0/24"}
+          />
         </label>
-        <button className="primary" onClick={() => startScan(false)} disabled={scanning}>
+        <button
+          className="primary"
+          onClick={() => startScan(false)}
+          disabled={scanning || !cidrValid}
+          title={cidrValid ? undefined : "Enter a valid IPv4 CIDR to scan"}
+        >
           Start Scan
         </button>
-        <button onClick={toggleMonitor} aria-pressed={monitoring}>
+        <button onClick={toggleMonitor} aria-pressed={monitoring} disabled={!monitoring && !cidrValid}>
           {monitoring ? "Stop Monitor" : "Monitor"}
         </button>
+        <label className="field">
+          <span>Every</span>
+          <select
+            value={monitorMs}
+            onChange={(event) => setMonitorMs(Number(event.target.value))}
+            aria-label="Monitor interval"
+          >
+            {MONITOR_INTERVALS.map((interval) => (
+              <option key={interval.ms} value={interval.ms}>
+                {interval.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button onClick={cancelScan} disabled={!scanning}>
           Cancel
         </button>
-        <label className="toggle compact">
+        <label className="toggle compact" title="Include addresses that were checked but gave no response">
           <input type="checkbox" checked={showCheckedOnly} onChange={(event) => setShowCheckedOnly(event.target.checked)} />
-          <span>Show checked-only</span>
+          <span>Show unresponsive</span>
         </label>
       </section>
 
       <section className="status" aria-label="Scan status">
-        <span>{scanning ? "scanning" : "not scanning"}</span>
+        <span>{scanning ? "scanning" : "idle"}</span>
         <span>{checkedHosts}/{totalHosts || 0} hosts checked</span>
         <span>{aliveRows.length} alive</span>
         <span>{openPortsFound} open ports</span>
         <span>{offlineCount} offline</span>
         <span>{visibleRows.length} shown</span>
-        {hiddenCheckedOnly > 0 && <span>{hiddenCheckedOnly} checked-only hidden</span>}
-        {monitoring && <span>monitoring every 15s</span>}
+        {hiddenCheckedOnly > 0 && <span>{hiddenCheckedOnly} unresponsive hidden</span>}
+        {monitoring && <span>monitoring every {MONITOR_INTERVALS.find((interval) => interval.ms === monitorMs)?.label}</span>}
+        {scanning && totalHosts > 0 && (
+          <div
+            className="progressTrack"
+            role="progressbar"
+            aria-label="Scan progress"
+            aria-valuemin={0}
+            aria-valuemax={totalHosts}
+            aria-valuenow={Math.min(checkedHosts, totalHosts)}
+          >
+            <div className="progressFill" style={{ width: `${Math.min(100, (checkedHosts / totalHosts) * 100)}%` }} />
+          </div>
+        )}
       </section>
 
       {updateInfo.available && tab !== "update" && (
@@ -590,14 +682,14 @@ function App() {
         ))}
       </nav>
 
-      {error && (
-        <div className="error" role="alert">
-          <span>{error}</span>
-          <button className="errorDismiss" onClick={() => setError("")} aria-label="Dismiss error">
+      {errors.map((item) => (
+        <div className="error" role="alert" key={item.id}>
+          <span>{item.text}</span>
+          <button className="errorDismiss" onClick={() => dismissError(item.id)} aria-label="Dismiss error">
             ×
           </button>
         </div>
-      )}
+      ))}
 
       {tab === "table" && <TableView rows={visibleRows} states={deviceStates} hiddenCount={hiddenCheckedOnly} />}
       {tab === "graph" && <GraphView hosts={visibleRows} states={deviceStates} />}
@@ -869,48 +961,189 @@ function probeOutcomeDetail(status: ProbeServiceStatus) {
   return status.message || "Refresh to read the latest service status.";
 }
 
+type SortKey =
+  | "ip"
+  | "hostname"
+  | "mac"
+  | "vendor"
+  | "state"
+  | "alive"
+  | "ports"
+  | "type"
+  | "first_seen"
+  | "last_updated";
+
+const TABLE_COLUMNS: { key: SortKey; label: string }[] = [
+  { key: "ip", label: "IP" },
+  { key: "hostname", label: "Hostname" },
+  { key: "mac", label: "MAC" },
+  { key: "vendor", label: "Vendor" },
+  { key: "state", label: "State" },
+  { key: "alive", label: "Alive" },
+  { key: "ports", label: "Open ports" },
+  { key: "type", label: "Guessed device type" },
+  { key: "first_seen", label: "First seen" },
+  { key: "last_updated", label: "Last updated" },
+];
+
+// textCompare sorts case-insensitively with blanks last, so sorting by
+// hostname doesn't pin every no-hostname address to the top.
+function textCompare(a: string, b: string) {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return a.localeCompare(b, undefined, { sensitivity: "base" });
+}
+
+function compareHosts(a: HostObservation, b: HostObservation, key: SortKey, states: Record<string, DeviceState>) {
+  switch (key) {
+    case "hostname":
+      return textCompare(a.hostname || "", b.hostname || "");
+    case "mac":
+      return textCompare(a.mac_address || "", b.mac_address || "");
+    case "vendor":
+      return textCompare(a.vendor || "", b.vendor || "");
+    case "state":
+      return textCompare(states[a.ip] || "stable", states[b.ip] || "stable");
+    case "alive":
+      return (b.alive ? 1 : 0) - (a.alive ? 1 : 0);
+    case "ports":
+      return b.open_ports.length - a.open_ports.length || textCompare(formatPorts(a.open_ports), formatPorts(b.open_ports));
+    case "type":
+      return textCompare(a.device_type, b.device_type);
+    case "first_seen":
+      return Date.parse(a.first_seen || "") - Date.parse(b.first_seen || "");
+    case "last_updated":
+      return Date.parse(a.last_updated || "") - Date.parse(b.last_updated || "");
+    default:
+      return 0;
+  }
+}
+
+function hostMatchesFilter(host: HostObservation, state: DeviceState, needle: string) {
+  return [
+    host.ip,
+    host.hostname || "",
+    host.mac_address || "",
+    host.vendor || "",
+    host.device_type,
+    state,
+    formatPorts(host.open_ports),
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(needle);
+}
+
 function TableView({ rows, states, hiddenCount }: { rows: HostObservation[]; states: Record<string, DeviceState>; hiddenCount: number }) {
+  const [filter, setFilter] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("ip");
+  const [sortAsc, setSortAsc] = useState(true);
+  const [selectedIP, setSelectedIP] = useState("");
+  // Selection survives filtering (the panel stays open while narrowing), but
+  // closes when the host disappears from the results entirely.
+  const selected = rows.find((host) => host.ip === selectedIP);
+
+  function toggleSelect(ip: string) {
+    setSelectedIP((current) => (current === ip ? "" : ip));
+  }
+
+  const visible = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    const filtered = needle ? rows.filter((host) => hostMatchesFilter(host, states[host.ip] || "stable", needle)) : rows;
+    const sorted = [...filtered].sort((a, b) => {
+      const order = compareHosts(a, b, sortKey, states) || compareIP(a.ip, b.ip);
+      return sortAsc ? order : -order;
+    });
+    return sorted;
+  }, [rows, states, filter, sortKey, sortAsc]);
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortAsc((asc) => !asc);
+    } else {
+      setSortKey(key);
+      setSortAsc(true);
+    }
+  }
+
   return (
-    <section className="tableWrap" aria-label="Scan results">
+    <section className={`tableLayout ${selected ? "withDetail" : ""}`} aria-label="Scan results">
+      <div className="tableWrap">
+      <div className="tableTools">
+        <input
+          className="tableFilter"
+          type="search"
+          placeholder="Filter by IP, hostname, MAC, vendor, port…"
+          aria-label="Filter scan results"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+        />
+        {filter.trim() && (
+          <span className="quiet">
+            {visible.length} of {rows.length} match
+          </span>
+        )}
+      </div>
       <table>
         <thead>
           <tr>
-            <th>IP</th>
-            <th>Hostname</th>
-            <th>MAC</th>
-            <th>Vendor</th>
-            <th>State</th>
-            <th>Alive</th>
-            <th>Open ports</th>
-            <th>Guessed device type</th>
-            <th>First seen</th>
-            <th>Last updated</th>
+            {TABLE_COLUMNS.map((column) => (
+              <th
+                key={column.key}
+                aria-sort={sortKey === column.key ? (sortAsc ? "ascending" : "descending") : undefined}
+              >
+                <button type="button" className="sortHeader" onClick={() => toggleSort(column.key)}>
+                  {column.label}
+                  {sortKey === column.key && <span className="sortArrow" aria-hidden="true">{sortAsc ? "▲" : "▼"}</span>}
+                </button>
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((host) => (
-            <tr key={host.ip}>
+          {visible.map((host) => (
+            <tr
+              key={host.ip}
+              className={`hostRow ${selectedIP === host.ip ? "selected" : ""}`}
+              tabIndex={0}
+              onClick={() => toggleSelect(host.ip)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  toggleSelect(host.ip);
+                }
+              }}
+            >
               <td>{host.ip}</td>
-              <td>{host.hostname || ""}</td>
+              <td title={host.hostname || undefined}>{host.hostname || ""}</td>
               <td>{host.mac_address || ""}</td>
-              <td>{host.vendor || ""}</td>
+              <td title={host.vendor || undefined}>{host.vendor || ""}</td>
               <td><StatePill state={states[host.ip] || "stable"} /></td>
               <td>{host.alive ? "yes" : "no"}</td>
-              <td>{formatPorts(host.open_ports)}</td>
+              <td title={formatPorts(host.open_ports) || undefined}>{formatPorts(host.open_ports)}</td>
               <td>{host.device_type}</td>
               <td>{formatTime(host.first_seen)}</td>
               <td>{formatTime(host.last_updated)}</td>
             </tr>
           ))}
-          {rows.length === 0 && (
+          {visible.length === 0 && (
             <tr>
               <td className="empty" colSpan={10}>
-                {hiddenCount > 0 ? `${hiddenCount} checked-only hosts hidden.` : "No scan results yet."}
+                {rows.length > 0
+                  ? "No hosts match the filter."
+                  : hiddenCount > 0
+                    ? `${hiddenCount} unresponsive hosts hidden.`
+                    : "No scan results yet. Enter a CIDR and press Start Scan."}
               </td>
             </tr>
           )}
         </tbody>
       </table>
+      </div>
+      {selected && (
+        <DeviceDetail host={selected} state={states[selected.ip]} onClose={() => setSelectedIP("")} />
+      )}
     </section>
   );
 }
@@ -1106,7 +1339,7 @@ function HistoryView({ history, diff, onRefresh }: { history: ScanRun[]; diff: S
   );
 }
 
-function DeviceDetail({ host, state = "stable" }: { host?: HostObservation; state?: DeviceState }) {
+function DeviceDetail({ host, state = "stable", onClose }: { host?: HostObservation; state?: DeviceState; onClose?: () => void }) {
   const [history, setHistory] = useState<HostHistoryEntry[]>([]);
   const ip = host?.ip || "";
 
@@ -1131,7 +1364,14 @@ function DeviceDetail({ host, state = "stable" }: { host?: HostObservation; stat
       {host ? (
         <>
           <div className="detailHeader">
-            <h2>{host.hostname || host.ip}</h2>
+            <div className="detailTitle">
+              <h2>{host.hostname || host.ip}</h2>
+              {onClose && (
+                <button className="detailClose" onClick={onClose} aria-label="Close details">
+                  ×
+                </button>
+              )}
+            </div>
             <div className="detailBadges">
               <span>
                 {CATEGORY_EMOJI[categoryFor(host)] ? `${CATEGORY_EMOJI[categoryFor(host)]} ` : ""}
@@ -1390,9 +1630,31 @@ function formatPorts(ports: PortObservation[]) {
   return ports.map((port) => `${port.port}/${port.service}`).join(", ");
 }
 
+// formatTime keeps today's observations short (time only) but never hides the
+// date of older ones — "First seen" on a device from last week must not read
+// like this morning.
 function formatTime(value: string) {
   if (!value) return "";
-  return new Date(value).toLocaleTimeString();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const now = new Date();
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (date.toDateString() === now.toDateString()) return time;
+  const day = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+  });
+  return `${day} ${time}`;
+}
+
+// isValidCIDR mirrors the backend's scanner.ValidateCIDR closely enough for
+// live feedback; the backend stays the source of truth when the scan starts.
+function isValidCIDR(value: string) {
+  const match = value.trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/);
+  if (!match) return false;
+  if (match.slice(1, 5).some((octet) => Number(octet) > 255)) return false;
+  return Number(match[5]) <= 32;
 }
 
 function compareIP(a: string, b: string) {
