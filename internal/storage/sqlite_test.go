@@ -104,6 +104,41 @@ func TestPruneScanRuns(t *testing.T) {
 	}
 }
 
+func TestDeleteScanRun(t *testing.T) {
+	ctx := context.Background()
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "netviz.db"))
+	if err != nil {
+		t.Fatalf("OpenSQLite: %v", err)
+	}
+	defer store.Close()
+
+	start := time.Now().UTC()
+	for i, id := range []string{"first", "second"} {
+		run := model.ScanRun{ID: id, CIDR: "192.168.1.0/24", StartedAt: start.Add(time.Duration(i) * time.Minute)}
+		hosts := []model.HostObservation{host("192.168.1.10", id+".local", true, "web_device", 80)}
+		if err := store.SaveScanRun(ctx, run, hosts); err != nil {
+			t.Fatalf("SaveScanRun %s: %v", id, err)
+		}
+	}
+
+	if err := store.DeleteScanRun(ctx, "first"); err != nil {
+		t.Fatalf("DeleteScanRun: %v", err)
+	}
+	runs, err := store.ListScanRuns(ctx, 10)
+	if err != nil {
+		t.Fatalf("ListScanRuns: %v", err)
+	}
+	if len(runs) != 1 || runs[0].ID != "second" {
+		t.Fatalf("unexpected surviving runs: %#v", runs)
+	}
+	if hosts, err := store.HostsForRun(ctx, "first"); err != nil || len(hosts) != 0 {
+		t.Fatalf("deleted run observations: hosts=%v err=%v, want none", hosts, err)
+	}
+	if err := store.DeleteScanRun(ctx, "missing"); err == nil {
+		t.Fatal("deleting an unknown run should error")
+	}
+}
+
 func TestSQLiteStoreSaveListAndDiff(t *testing.T) {
 	ctx := context.Background()
 	store, err := OpenSQLite(filepath.Join(t.TempDir(), "netviz.db"))

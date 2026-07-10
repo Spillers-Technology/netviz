@@ -115,14 +115,17 @@ declare global {
     go?: {
       main?: {
         App?: {
-          StartScan(cidr: string): Promise<void>;
-          StartMonitorScan(cidr: string): Promise<void>;
+          StartScan(cidr: string, ports: number[]): Promise<void>;
+          StartMonitorScan(cidr: string, ports: number[]): Promise<void>;
           CancelScan(): Promise<void>;
+          DefaultPorts(): Promise<PortObservation[]>;
           SaveScanFile(): Promise<void>;
           OpenScanFile(): Promise<HostObservation[] | null>;
           SaveCSVFile(): Promise<void>;
           ListHistory(): Promise<ScanRun[]>;
           LatestDiff(): Promise<ScanDiff>;
+          DiffRuns(baseRunID: string, compareRunID: string): Promise<ScanDiff>;
+          DeleteRun(runID: string): Promise<void>;
           HostHistory(ip: string): Promise<HostHistoryEntry[]>;
           ChooseProbeBinary(): Promise<string>;
           GetProbeStatus(probePath: string): Promise<ProbeServiceStatus>;
@@ -166,6 +169,18 @@ function writeSetting(key: string, value: string) {
   }
 }
 
+// parseExtraPorts accepts "8006, 9443 10000" and keeps only valid, unique
+// TCP ports; everything else is silently dropped so typing never errors.
+function parseExtraPorts(text: string): number[] {
+  const ports = new Set<number>();
+  for (const token of text.split(/[\s,;]+/)) {
+    if (!/^\d{1,5}$/.test(token)) continue;
+    const port = Number(token);
+    if (port >= 1 && port <= 65535) ports.add(port);
+  }
+  return [...ports];
+}
+
 function App() {
   const [cidr, setCidr] = useState(() => readSetting("netviz.cidr") || "192.168.1.0/24");
   const [hosts, setHosts] = useState<Record<string, HostObservation>>({});
@@ -177,6 +192,17 @@ function App() {
   const [monitoring, setMonitoring] = useState(false);
   const [showCheckedOnly, setShowCheckedOnly] = useState(false);
   const [fileOpen, setFileOpen] = useState(false);
+  const [portsOpen, setPortsOpen] = useState(false);
+  const [portDefs, setPortDefs] = useState<PortObservation[]>([]);
+  const [disabledPorts, setDisabledPorts] = useState<number[]>(() => {
+    try {
+      const saved = JSON.parse(readSetting("netviz.disabledPorts") || "[]");
+      return Array.isArray(saved) ? saved.filter((p) => Number.isInteger(p)) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [extraPorts, setExtraPorts] = useState(() => readSetting("netviz.extraPorts") || "");
   const [checkedHosts, setCheckedHosts] = useState(0);
   const [totalHosts, setTotalHosts] = useState(0);
   const [errors, setErrors] = useState<AppError[]>([]);
@@ -218,6 +244,7 @@ function App() {
   const monitoringRef = useRef(false);
   const scanningRef = useRef(false);
   const cidrRef = useRef(cidr);
+  const scanPortsRef = useRef<number[]>([]);
   // Mirror of the hosts state, so event handlers can read the previous
   // observation without doing work inside a React state updater.
   const hostsRef = useRef<Record<string, HostObservation>>({});
@@ -250,6 +277,14 @@ function App() {
   }, [monitorMs]);
 
   useEffect(() => {
+    writeSetting("netviz.disabledPorts", JSON.stringify(disabledPorts));
+  }, [disabledPorts]);
+
+  useEffect(() => {
+    writeSetting("netviz.extraPorts", extraPorts);
+  }, [extraPorts]);
+
+  useEffect(() => {
     scanningRef.current = scanning;
   }, [scanning]);
 
@@ -261,6 +296,9 @@ function App() {
     refreshHistory();
     refreshProbeStatus();
     checkForUpdates(false);
+    window.go?.main?.App?.DefaultPorts?.()
+      .then((defs) => setPortDefs(defs || []))
+      .catch(() => {});
     const offEvent = window.runtime?.EventsOn("scan:event", (payload) => {
       const event = payload as ScanEvent;
       if (event.host) {
@@ -311,6 +349,21 @@ function App() {
   }, [rows, deviceStates, showCheckedOnly]);
 
   const cidrValid = isValidCIDR(cidr);
+  // With nothing customized an empty list is sent and the scanner uses its
+  // defaults; a customized selection is sent explicitly.
+  const extraPortList = useMemo(() => parseExtraPorts(extraPorts), [extraPorts]);
+  const portsCustomized = disabledPorts.length > 0 || extraPortList.length > 0;
+  const scanPorts = useMemo(() => {
+    if (!portsCustomized) return [];
+    const enabled = portDefs.map((def) => def.port).filter((port) => !disabledPorts.includes(port));
+    return [...new Set([...enabled, ...extraPortList])].sort((a, b) => a - b);
+  }, [portsCustomized, portDefs, disabledPorts, extraPortList]);
+  const portsValid = !portsCustomized || (scanPorts.length > 0 && scanPorts.length <= 64);
+
+  useEffect(() => {
+    scanPortsRef.current = scanPorts;
+  }, [scanPorts]);
+
   const aliveRows = rows.filter((host) => host.alive);
   const openPortsFound = rows.reduce((sum, host) => sum + host.open_ports.length, 0);
   const offlineCount = Object.values(deviceStates).filter((state) => state === "offline").length;
@@ -411,9 +464,9 @@ function App() {
     setTotalHosts(0);
     try {
       if (preserve) {
-        await window.go?.main?.App?.StartMonitorScan(cidrRef.current);
+        await window.go?.main?.App?.StartMonitorScan(cidrRef.current, scanPortsRef.current);
       } else {
-        await window.go?.main?.App?.StartScan(cidrRef.current);
+        await window.go?.main?.App?.StartScan(cidrRef.current, scanPortsRef.current);
       }
       setScanning(true);
       scanningRef.current = true;
@@ -608,12 +661,18 @@ function App() {
         <button
           className="primary"
           onClick={() => startScan(false)}
-          disabled={scanning || !cidrValid}
-          title={cidrValid ? undefined : "Enter a valid IPv4 CIDR to scan"}
+          disabled={scanning || !cidrValid || !portsValid}
+          title={
+            !cidrValid
+              ? "Enter a valid IPv4 CIDR to scan"
+              : !portsValid
+                ? "Select at least one port (max 64) in the Ports menu"
+                : undefined
+          }
         >
           Start Scan
         </button>
-        <button onClick={toggleMonitor} aria-pressed={monitoring} disabled={!monitoring && !cidrValid}>
+        <button onClick={toggleMonitor} aria-pressed={monitoring} disabled={!monitoring && (!cidrValid || !portsValid)}>
           {monitoring ? "Stop Monitor" : "Monitor"}
         </button>
         <label className="field">
@@ -633,6 +692,73 @@ function App() {
         <button onClick={cancelScan} disabled={!scanning}>
           Cancel
         </button>
+        <div
+          className="portsMenu"
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node)) setPortsOpen(false);
+          }}
+        >
+          <button
+            onClick={() => setPortsOpen((open) => !open)}
+            aria-expanded={portsOpen}
+            className={portsValid ? "" : "attention"}
+            title="Choose which TCP ports scans probe"
+          >
+            Ports{portsCustomized ? ` (${scanPorts.length})` : ""}
+          </button>
+          {portsOpen && (
+            <div className="portsPanel">
+              <div className="portsPanelHeader">
+                <strong>Scan ports</strong>
+                <button
+                  className="linklike"
+                  onClick={() => {
+                    setDisabledPorts([]);
+                    setExtraPorts("");
+                  }}
+                  disabled={!portsCustomized}
+                >
+                  Reset to defaults
+                </button>
+              </div>
+              <div className="portsGrid">
+                {portDefs.map((def) => (
+                  <label className="toggle compact" key={def.port}>
+                    <input
+                      type="checkbox"
+                      checked={!disabledPorts.includes(def.port)}
+                      onChange={(event) =>
+                        setDisabledPorts((current) =>
+                          event.target.checked ? current.filter((p) => p !== def.port) : [...current, def.port]
+                        )
+                      }
+                    />
+                    <span>
+                      {def.port} <em>{def.service}</em>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <label className="field wide">
+                <span>Extra ports (comma-separated)</span>
+                <input
+                  value={extraPorts}
+                  onChange={(event) => setExtraPorts(event.target.value)}
+                  placeholder="e.g. 8006, 9443"
+                />
+              </label>
+              <p className="quiet portsSummary">
+                {portsValid
+                  ? portsCustomized
+                    ? `${scanPorts.length} ports will be scanned.`
+                    : `Scanning the ${portDefs.length || "default"} default LAN ports.`
+                  : scanPorts.length === 0
+                    ? "Select at least one port."
+                    : `Too many ports selected (${scanPorts.length}); the limit is 64.`}
+              </p>
+            </div>
+          )}
+        </div>
         <label className="toggle compact" title="Include addresses that were checked but gave no response">
           <input type="checkbox" checked={showCheckedOnly} onChange={(event) => setShowCheckedOnly(event.target.checked)} />
           <span>Show unresponsive</span>
@@ -694,7 +820,7 @@ function App() {
       {tab === "table" && <TableView rows={visibleRows} states={deviceStates} hiddenCount={hiddenCheckedOnly} />}
       {tab === "graph" && <GraphView hosts={visibleRows} states={deviceStates} />}
       {tab === "hierarchy" && <HierarchyView hosts={visibleRows} states={deviceStates} />}
-      {tab === "history" && <HistoryView history={history} diff={diff} onRefresh={refreshHistory} />}
+      {tab === "history" && <HistoryView history={history} diff={diff} onRefresh={refreshHistory} onError={pushError} />}
       {tab === "probe" && (
         <ProbeView
           cidr={cidr}
@@ -1279,10 +1405,59 @@ function HierarchyView({ hosts, states }: { hosts: HostObservation[]; states: Re
   );
 }
 
-function HistoryView({ history, diff, onRefresh }: { history: ScanRun[]; diff: ScanDiff; onRefresh: () => void }) {
-  const newHosts = diff.new_hosts || [];
-  const missingHosts = diff.missing_hosts || [];
-  const changedHosts = diff.changed_hosts || [];
+function HistoryView({
+  history,
+  diff,
+  onRefresh,
+  onError,
+}: {
+  history: ScanRun[];
+  diff: ScanDiff;
+  onRefresh: () => void;
+  onError: (err: unknown) => void;
+}) {
+  const [baseID, setBaseID] = useState("");
+  const [compareID, setCompareID] = useState("");
+  const [customDiff, setCustomDiff] = useState<ScanDiff | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const shownDiff = customDiff || diff;
+  const canCompare = Boolean(baseID && compareID && baseID !== compareID);
+
+  async function compareRuns() {
+    const app = window.go?.main?.App;
+    if (!app || !canCompare) return;
+    setBusy(true);
+    try {
+      setCustomDiff(await app.DiffRuns(baseID, compareID));
+    } catch (err) {
+      onError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteRun(runID: string) {
+    const app = window.go?.main?.App;
+    if (!app) return;
+    setBusy(true);
+    try {
+      await app.DeleteRun(runID);
+      setConfirmDelete("");
+      if (runID === baseID) setBaseID("");
+      if (runID === compareID) setCompareID("");
+      if (customDiff && (customDiff.base_run_id === runID || customDiff.compare_run_id === runID)) {
+        setCustomDiff(null);
+      }
+      onRefresh();
+    } catch (err) {
+      onError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="historyWrap" aria-label="Scan history">
       <div className="historyHeader">
@@ -1292,6 +1467,9 @@ function HistoryView({ history, diff, onRefresh }: { history: ScanRun[]; diff: S
       <div className="historyGrid">
         <section className="historyPanel">
           <h3>Runs</h3>
+          {history.length > 1 && (
+            <p className="quiet">Mark a run A and another B to compare them; A is the older baseline.</p>
+          )}
           {history.map((run) => (
             <article className="runRow" key={run.id}>
               <div>
@@ -1303,39 +1481,87 @@ function HistoryView({ history, diff, onRefresh }: { history: ScanRun[]; diff: S
                 <span>{run.alive_count} alive</span>
                 <span>{run.open_port_count} ports</span>
               </div>
+              <div className="runActions">
+                <label className="runPick" title="Compare from (baseline)">
+                  <input type="radio" name="diff-base" checked={baseID === run.id} onChange={() => setBaseID(run.id)} />
+                  <span>A</span>
+                </label>
+                <label className="runPick" title="Compare to">
+                  <input
+                    type="radio"
+                    name="diff-compare"
+                    checked={compareID === run.id}
+                    onChange={() => setCompareID(run.id)}
+                  />
+                  <span>B</span>
+                </label>
+                {confirmDelete === run.id ? (
+                  <button className="small danger" onClick={() => deleteRun(run.id)} disabled={busy}>
+                    Confirm
+                  </button>
+                ) : (
+                  <button
+                    className="small"
+                    onClick={() => setConfirmDelete(run.id)}
+                    disabled={busy}
+                    aria-label={`Delete run from ${new Date(run.started_at).toLocaleString()}`}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </article>
           ))}
           {history.length === 0 && <p className="quiet">No saved scan runs yet.</p>}
         </section>
 
         <section className="historyPanel">
-          <h3>Latest diff</h3>
-          {history.length < 2 && <p className="quiet">Run two scans to compare history.</p>}
-          {history.length >= 2 && (
-            <div className="diffColumns">
-              <DiffList title="New" hosts={newHosts} />
-              <DiffList title="Missing" hosts={missingHosts} />
-              <section>
-                <h4>Changed</h4>
-                {changedHosts.map((change) => (
-                  <article className="diffItem" key={change.ip}>
-                    <strong>{change.ip}</strong>
-                    <span>
-                      {change.hostname_changed ? "hostname " : ""}
-                      {change.mac_changed ? "mac " : ""}
-                      {change.vendor_changed ? "vendor " : ""}
-                      {change.ports_changed ? "ports " : ""}
-                      {change.device_type_changed ? "type" : ""}
-                    </span>
-                  </article>
-                ))}
-                {changedHosts.length === 0 && <p className="quiet">None</p>}
-              </section>
+          <div className="diffHeader">
+            <h3>{customDiff ? "Comparing A → B" : "Latest diff"}</h3>
+            <div className="buttonRow">
+              <button className="small" onClick={compareRuns} disabled={busy || !canCompare}>
+                Compare A → B
+              </button>
+              {customDiff && (
+                <button className="small" onClick={() => setCustomDiff(null)}>
+                  Back to latest
+                </button>
+              )}
             </div>
-          )}
+          </div>
+          {!customDiff && history.length < 2 && <p className="quiet">Run two scans to compare history.</p>}
+          {(customDiff || history.length >= 2) && <DiffColumns diff={shownDiff} />}
         </section>
       </div>
     </section>
+  );
+}
+
+function DiffColumns({ diff }: { diff: ScanDiff }) {
+  const newHosts = diff.new_hosts || [];
+  const missingHosts = diff.missing_hosts || [];
+  const changedHosts = diff.changed_hosts || [];
+  return (
+    <div className="diffColumns">
+      <DiffList title="New" hosts={newHosts} />
+      <DiffList title="Missing" hosts={missingHosts} />
+      <section>
+        <h4>Changed</h4>
+        {changedHosts.map((change) => (
+          <article className="diffItem" key={change.ip}>
+            <strong>{change.ip}</strong>
+            <span>
+              {change.hostname_changed ? "hostname " : ""}
+              {change.mac_changed ? "mac " : ""}
+              {change.vendor_changed ? "vendor " : ""}
+              {change.ports_changed ? "ports " : ""}
+              {change.device_type_changed ? "type" : ""}
+            </span>
+          </article>
+        ))}
+        {changedHosts.length === 0 && <p className="quiet">None</p>}
+      </section>
+    </div>
   );
 }
 

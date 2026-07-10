@@ -51,17 +51,30 @@ func (a *App) startup(ctx context.Context) {
 	a.mu.Unlock()
 }
 
-func (a *App) StartScan(cidr string) error {
-	return a.startScan(cidr, false)
+// maxSelectedPorts bounds the per-scan port list; the scanner stays a
+// constrained LAN discovery tool, not a full port sweeper.
+const maxSelectedPorts = 64
+
+func (a *App) StartScan(cidr string, ports []int) error {
+	return a.startScan(cidr, ports, false)
 }
 
-func (a *App) StartMonitorScan(cidr string) error {
-	return a.startScan(cidr, true)
+func (a *App) StartMonitorScan(cidr string, ports []int) error {
+	return a.startScan(cidr, ports, true)
 }
 
-func (a *App) startScan(cidr string, preserveResults bool) error {
+// DefaultPorts exposes the scanner's default port table to the frontend so
+// the port picker lists exactly what a default scan probes.
+func (a *App) DefaultPorts() []scanner.PortDef {
+	return scanner.DefaultPortDefs
+}
+
+func (a *App) startScan(cidr string, ports []int, preserveResults bool) error {
 	if err := scanner.ValidateCIDR(cidr); err != nil {
 		return err
+	}
+	if len(ports) > maxSelectedPorts {
+		return fmt.Errorf("too many ports selected (%d); the limit is %d", len(ports), maxSelectedPorts)
 	}
 
 	a.mu.Lock()
@@ -84,6 +97,7 @@ func (a *App) startScan(cidr string, preserveResults bool) error {
 
 	s := scanner.NewScanner(scanner.ScanConfig{
 		CIDR:        cidr,
+		Ports:       ports,
 		Timeout:     450 * time.Millisecond,
 		Concurrency: 64,
 	})
@@ -264,6 +278,32 @@ func (a *App) LatestDiff() (*model.ScanDiff, error) {
 		return &model.ScanDiff{}, nil
 	}
 	return history.DiffLatest(context.Background())
+}
+
+// DiffRuns compares two stored runs picked in the history view.
+func (a *App) DiffRuns(baseRunID string, compareRunID string) (*model.ScanDiff, error) {
+	a.mu.Lock()
+	history := a.history
+	a.mu.Unlock()
+	if history == nil {
+		return &model.ScanDiff{}, nil
+	}
+	return history.DiffRuns(context.Background(), baseRunID, compareRunID)
+}
+
+// DeleteRun removes one stored scan run and its observations.
+func (a *App) DeleteRun(runID string) error {
+	a.mu.Lock()
+	history := a.history
+	a.mu.Unlock()
+	if history == nil {
+		return fmt.Errorf("history store is unavailable")
+	}
+	if err := history.DeleteScanRun(context.Background(), runID); err != nil {
+		return err
+	}
+	runtime.EventsEmit(a.ctx, "history:updated", nil)
+	return nil
 }
 
 func (a *App) consumeEvents(events <-chan model.ScanEvent) {

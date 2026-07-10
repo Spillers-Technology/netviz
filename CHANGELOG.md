@@ -21,6 +21,12 @@ Added:
 - A progress bar in the status strip while a scan is running.
 - `netviz-cli version` and `netviz-cli help` (unknown usage now points at
   help instead of failing with only "CIDR is required").
+- Port selection: a Ports menu in the toolbar toggles the default LAN ports
+  and accepts extra ports (max 64 per scan, persisted); the CLI gained a
+  matching `-ports 22,80,443` flag. Scans stay constrained — this is a
+  bounded picker, not an arbitrary sweep.
+- History management: any two stored runs can be compared (pick A and B in
+  the runs list), and runs can be deleted with a confirm step.
 
 Changed:
 

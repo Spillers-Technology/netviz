@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 	"os/signal"
 	"path/filepath"
 	"sort"
@@ -51,7 +53,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprint(w, `netviz-cli — NetViz LAN scanner
 
 Usage:
-  netviz-cli scan -cidr 192.168.1.0/24 [-save]   scan a network, stream JSON events
+  netviz-cli scan -cidr 192.168.1.0/24 [-save] [-ports 22,80,443]
+                                                 scan a network, stream JSON events
   netviz-cli history [-limit 20]                 list saved scan runs
   netviz-cli diff [-base ID -compare ID]         diff two runs (default: latest two)
   netviz-cli version                             print the version
@@ -61,13 +64,45 @@ Only scan networks you own or are authorized to scan.
 `)
 }
 
+// maxSelectedPorts matches the desktop's per-scan limit: the scanner stays a
+// constrained LAN discovery tool, not a full port sweeper.
+const maxSelectedPorts = 64
+
+// parsePortList turns "80,443, 8080" into unique ports, preserving order.
+// Range validation is left to scanner.NormalizePorts.
+func parsePortList(text string) ([]int, error) {
+	var ports []int
+	seen := map[int]struct{}{}
+	for _, token := range strings.Split(text, ",") {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			continue
+		}
+		port, err := strconv.Atoi(token)
+		if err != nil {
+			return nil, fmt.Errorf("invalid port %q in -ports", token)
+		}
+		if _, ok := seen[port]; ok {
+			continue
+		}
+		seen[port] = struct{}{}
+		ports = append(ports, port)
+	}
+	if len(ports) > maxSelectedPorts {
+		return nil, fmt.Errorf("too many ports (%d); the limit is %d", len(ports), maxSelectedPorts)
+	}
+	return ports, nil
+}
+
 func runScan(args []string) error {
 	flags := flag.NewFlagSet("scan", flag.ExitOnError)
 	var cidr string
 	var save bool
+	var portsFlag string
 
 	flags.StringVar(&cidr, "cidr", "", "IPv4 CIDR to scan, for example 192.168.1.0/24")
 	flags.BoolVar(&save, "save", false, "save completed scan to local SQLite history")
+	flags.StringVar(&portsFlag, "ports", "", "comma-separated TCP ports to probe instead of the defaults, for example 22,80,443")
 	flags.Parse(args)
 
 	if cidr == "" && flags.NArg() == 1 {
@@ -76,12 +111,17 @@ func runScan(args []string) error {
 	if cidr == "" {
 		return errors.New("CIDR is required; use -cidr 192.168.1.0/24 (netviz-cli help lists all commands)")
 	}
+	ports, err := parsePortList(portsFlag)
+	if err != nil {
+		return err
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	s := scanner.NewScanner(scanner.ScanConfig{
-		CIDR: cidr,
+		CIDR:  cidr,
+		Ports: ports,
 	})
 	events, err := s.Scan(ctx)
 	if err != nil {

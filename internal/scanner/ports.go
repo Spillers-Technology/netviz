@@ -6,8 +6,8 @@ import (
 )
 
 type PortDef struct {
-	Port    int
-	Service string
+	Port    int    `json:"port"`
+	Service string `json:"service"`
 }
 
 var DefaultPortDefs = []PortDef{
