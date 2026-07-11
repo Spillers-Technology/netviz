@@ -1,0 +1,51 @@
+name: Bug report
+description: Tell us what broke and how it affected the workflow.
+title: "[Bug]: "
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the useful signal. Please remove secrets and real customer data before submitting.
+  - type: textarea
+    id: impact
+    attributes:
+      label: Operator impact
+      description: What were you trying to finish, and what did this block or make unreliable?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Give us the smallest set of steps that reproduces the problem.
+      placeholder: "1. Start from…\n2. Choose…\n3. Observe…"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v1.2.3 or commit SHA
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser/runtime, deployment method, and relevant integrations.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Add logs or screenshots after removing tokens, credentials, caller/customer data, IPs, and private hostnames.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety check
+      options:
+        - label: I searched existing issues and removed secrets and identifying data.
+          required: true

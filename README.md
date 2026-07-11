@@ -298,3 +298,9 @@ Security posture and threat model live in [SECURITY.md](SECURITY.md).
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Contributing
+
+Issues and focused pull requests are welcome. Please read
+[CONTRIBUTING.md](CONTRIBUTING.md) for authorized-use boundaries, local checks,
+and platform-testing expectations.

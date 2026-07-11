@@ -1,0 +1,180 @@
+/* Shared, dependency-free product screenshot lightbox. */
+.lightbox-trigger {
+  appearance: none;
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: zoom-in;
+}
+
+.lightbox-trigger img {
+  cursor: inherit;
+  transition: filter 160ms ease, transform 160ms ease, outline-color 160ms ease;
+}
+
+.lightbox-trigger:hover img {
+  filter: brightness(1.04);
+}
+
+.lightbox-trigger:focus-visible {
+  outline: 3px solid #f4a340;
+  outline-offset: 4px;
+}
+
+.lightbox-host {
+  position: relative;
+}
+
+.lightbox-badge {
+  position: absolute;
+  z-index: 2;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.58rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(8, 11, 15, 0.82);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.24);
+  color: #fff;
+  font: 700 0.68rem/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+.lightbox-badge svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.image-lightbox {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  overflow: hidden;
+}
+
+.image-lightbox::backdrop {
+  background: rgba(3, 5, 8, 0.94);
+  backdrop-filter: blur(10px);
+}
+
+.image-lightbox[open] {
+  display: block;
+}
+
+.image-lightbox__shell {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  padding: clamp(3.75rem, 8vw, 5.25rem) clamp(0.75rem, 3vw, 2rem) clamp(0.75rem, 2vw, 1.25rem);
+}
+
+.image-lightbox__viewport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
+.image-lightbox__image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 0.4rem;
+  box-shadow: 0 1.5rem 5rem rgba(0, 0, 0, 0.56);
+  cursor: zoom-in;
+  user-select: none;
+}
+
+.image-lightbox__image.is-zoomed {
+  max-width: none;
+  max-height: none;
+  cursor: zoom-out;
+}
+
+.image-lightbox__close {
+  position: fixed;
+  z-index: 3;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: rgba(10, 13, 18, 0.86);
+  color: #fff;
+  font: 300 2rem/1 system-ui, sans-serif;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.image-lightbox__close:hover,
+.image-lightbox__close:focus-visible {
+  border-color: #f4a340;
+  color: #ffc371;
+  outline: none;
+}
+
+.image-lightbox__footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 2.5rem;
+  padding-top: 0.65rem;
+  color: rgba(255, 255, 255, 0.78);
+  font: 500 0.78rem/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  text-align: center;
+}
+
+.image-lightbox__caption:empty {
+  display: none;
+}
+
+.image-lightbox__hint {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 560px) {
+  .lightbox-badge { top: 0.5rem; right: 0.5rem; }
+  .image-lightbox__footer { align-items: center; flex-direction: column; gap: 0.15rem; }
+  .image-lightbox__shell { padding-inline: 0.45rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lightbox-trigger img { transition: none; }
+}

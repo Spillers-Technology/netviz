@@ -526,6 +526,13 @@ h1 {
   transition: transform 160ms ease;
 }
 
+.shot.lightbox-trigger {
+  display: grid;
+  gap: 10px;
+  color: rgba(238, 245, 241, 0.82);
+  font-size: 14px;
+}
+
 .shot:hover {
   transform: translateY(-3px);
   color: #ffffff;
