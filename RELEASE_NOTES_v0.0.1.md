@@ -1,3 +1,10 @@
+> **Historical record — practice retired.** Dedicated per-version
+> `RELEASE_NOTES_vX.Y.Z.md` files were written for v0.0.1 through v0.2.0 only.
+> Starting with v0.3.0, [CHANGELOG.md](CHANGELOG.md) is the sole release-notes
+> location; no further `RELEASE_NOTES_*.md` files will be added. See
+> [RELEASING.md](RELEASING.md) for the current release process. This file is
+> kept as-is for historical reference.
+
 # NetViz v0.0.1
 
 NetViz v0.0.1 is the first public desktop release of a modern FOSS LAN scanner

@@ -81,7 +81,9 @@ Code health:
 Version and docs:
 
 - Bump `internal/version/version.go` to the release version
-- [CHANGELOG.md](CHANGELOG.md) entry with the release date
+- [CHANGELOG.md](CHANGELOG.md) entry with the release date — this is the sole
+  release-notes location (per-version `RELEASE_NOTES_vX.Y.Z.md` files were
+  retired after v0.2.0; do not add a new one)
 - [MILESTONES.md](MILESTONES.md) status reflects what actually shipped
 - README roadmap and feature text match the release
 
