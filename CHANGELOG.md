@@ -1,5 +1,11 @@
 # Changelog
 
+CHANGELOG.md is the sole release-notes location for NetViz. Dedicated
+per-version `RELEASE_NOTES_vX.Y.Z.md` files were used through v0.2.0 and are
+kept in the repo root as a historical record; that practice was retired
+starting with v0.3.0 in favor of this file. See [RELEASING.md](RELEASING.md)
+for the release process.
+
 ## v0.9.5 — 2026-07-10
 
 Release-readiness pass for the v0.9 desktop build.
@@ -366,5 +372,6 @@ Known limitations:
 - Installers/signing/notarization are not polished yet.
 - This is not a vulnerability scanner, RMM, credential tool, or Nmap wrapper.
 
-See [RELEASE_NOTES_v0.0.1.md](RELEASE_NOTES_v0.0.1.md) for product-facing
-release notes.
+See [RELEASE_NOTES_v0.0.1.md](RELEASE_NOTES_v0.0.1.md) for the historical
+product-facing release notes written at the time (practice retired after
+v0.2.0 — see the note at the top of this file).
