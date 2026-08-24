@@ -3,6 +3,8 @@
 
 **See everything on your local network — in seconds, with one download.**
 
+**Current release: v0.9.5.**
+
 NetViz is a free, open-source LAN scanner and network visualizer for Windows,
 macOS, and Linux. Point it at your network, hit scan, and watch devices appear
 live as tables, a grouped graph, and a clickable hierarchy map. It's a modern
