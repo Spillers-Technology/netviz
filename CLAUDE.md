@@ -86,6 +86,24 @@ longer accurate. v0.0.1 now includes:
 - No RMM-like workflows.
 - No server ingest before the server milestone.
 - No multi-tenancy at all — AnchorDesk owns tenancy; NetViz stays single-site.
+- **No printer driver catalog, no vendor-specific driver resolution, and no printer-driver
+  install/mutation logic of any kind.** That is SpoolSmith's job, in SpoolSmith's own repo — see
+  `corporate-strategy/board/meetings/2026-09-03-spoolsmith-new-product/04-decision-record.md`
+  (DR-0005). NetViz stays a scanner that emits observations.
+- **No printer-specific active fingerprinting (SNMP walks, HTTP device-UI page fetches,
+  PJL/JetDirect probing) added to NetViz's scanner core** as a consequence of SpoolSmith's needs,
+  ever, without its own separate board/operator motion. SpoolSmith gathers that evidence itself.
+
+## SpoolSmith integration (DR-0005 §4)
+
+NetViz may hand SpoolSmith `HostObservation`-shaped evidence (see `internal/model/host.go`) and
+may invoke SpoolSmith for a **read-only preview/plan request only** — e.g. "flag this as a likely
+printer, ask SpoolSmith what it would do, show the answer." NetViz must never invoke, trigger, or
+pass through any SpoolSmith operation that mutates anything, locally or remotely. This is the
+operator's explicit, informed choice (made over a named Security-seat objection that this
+invocation surface could erode toward RMM-like behavior one clause at a time) — see the decision
+record for the full reasoning and the guardrail this boundary depends on: "invoke" never means
+"mutate," and any proposal to widen it returns to the board.
 
 ## Commands
 
