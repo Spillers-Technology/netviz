@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [Linux, macOS]
+        os: [Linux]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -58,18 +58,15 @@ jobs:
           npm ci --prefix desktop/frontend
           npm run --prefix desktop/frontend build
           export PATH="$HOME/go/bin:$PATH"
-          (cd desktop && wails build)
+          # Debian 13 and Ubuntu 24.04+ ship WebKitGTK 4.1 only; Wails links 4.0 by default.
+          (cd desktop && wails build -tags webkit2_41)
       - name: Stage archive
         shell: bash
         run: |
           mkdir -p "dist/netviz/bin"
           cp -R dist/bin/. "dist/netviz/bin/"
-          if [ "${{ steps.meta.outputs.goos }}" = "darwin" ]; then
-            cp -R desktop/build/bin/netviz.app "dist/netviz/"
-          else
-            cp desktop/build/bin/netviz "dist/netviz/netviz"
-            chmod +x "dist/netviz/netviz"
-          fi
+          cp desktop/build/bin/netviz "dist/netviz/netviz"
+          chmod +x "dist/netviz/netviz"
           cp README.md LICENSE CHANGELOG.md MILESTONES.md PROBE_DEPLOYMENT.md "dist/netviz/"
           tar -C dist -czf "${{ steps.meta.outputs.asset }}" netviz
           shasum -a 256 "${{ steps.meta.outputs.asset }}" > "${{ steps.meta.outputs.asset }}.sha256"

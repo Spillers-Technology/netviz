@@ -6,7 +6,20 @@ kept in the repo root as a historical record; that practice was retired
 starting with v0.3.0 in favor of this file. See [RELEASING.md](RELEASING.md)
 for the release process.
 
-## Unreleased
+## v1.0.0 — 2026-09-20
+
+The first signed release: v0.9.5 plus trust. The feature set is the frozen
+v0.9 set; the wire contract, CLI flags, file formats and SQLite schema follow
+the semver policy in the README from this release on.
+
+**Windows binaries are signed.** `netviz.exe`, `netviz-cli.exe`,
+`netviz-server.exe` and `netviz-probe.exe` in the Windows archive carry an
+Authenticode signature with an RFC 3161 timestamp. Releases through v0.9.5 are
+unsigned. Verify a download with `scripts/verify-signature.ps1`.
+
+**macOS has no prebuilt archive in this release.** No macOS runner is
+available; macOS builds from source, and signed/notarized macOS archives are
+deferred. Linux and Windows archives ship as before.
 
 Added:
 
@@ -14,7 +27,7 @@ Added:
   Authenticode-signs `netviz.exe`, `netviz-cli.exe`, `netviz-server.exe` and
   `netviz-probe.exe` with Azure Artifact Signing before staging the archive, and
   fails rather than publish a Windows release it could not sign. Takes effect
-  with the next release; releases through v0.9.5 are unsigned.
+  with v1.0.0; releases through v0.9.5 are unsigned.
 - A `Signing check` workflow that builds, signs and verifies the Windows
   executables without publishing anything, and `scripts/verify-signature.ps1` for
   checking a signature with nothing installed but Windows.
@@ -29,6 +42,10 @@ Changed:
 - `RELEASING.md` documents the signing setup, the Azure CLI the Windows runner
   now needs, and that the `deploy/Dockerfile.release` fallback cannot produce a
   signed Windows archive.
+- The release workflow builds the Linux archive only; the macOS matrix entry is
+  gone from the release and desktop workflows. The Linux desktop build passes
+  `-tags webkit2_41`, so it builds against WebKitGTK 4.1 (Debian 13, Ubuntu
+  24.04+) and needs `libwebkit2gtk-4.1` at run time.
 
 ## v0.9.5 — 2026-07-10
 

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="NetViz is a free, open-source LAN scanner and network visualizer for Windows, macOS, and Linux. Scan a CIDR, watch devices stream in live, and explore them as a table, grouped graph, and hierarchy map — plus an always-on probe, a self-hosted server with an interactive network map, and OIDC SSO."
+      content="NetViz is a free, open-source LAN scanner and network visualizer for Windows and Linux. Scan a CIDR, watch devices stream in live, and explore them as a table, grouped graph, and hierarchy map — plus an always-on probe, a self-hosted server with an interactive network map, and OIDC SSO."
     />
     <meta property="og:title" content="NetViz | Free LAN Scanner &amp; Network Visualizer" />
     <meta
@@ -117,7 +117,7 @@
             A free, open-source LAN scanner and network visualizer. Enter a
             CIDR, hit scan, and watch every device on your network stream in
             live — as a precise table, a grouped graph, and a clickable
-            hierarchy map. Windows, macOS, and Linux.
+            hierarchy map. Windows and Linux.
           </p>
           <div class="heroActions">
             <a class="button primary" href="#download">Download for free</a>
@@ -142,20 +142,17 @@
             <em>netviz-&lt;version&gt;-windows-amd64.zip</em>
           </a>
           <a class="dl" href="https://github.com/Spillers-Technology/netviz/releases/latest">
-            <b>macOS</b>
-            <span>Extract and open <code>netviz/netviz.app</code></span>
-            <em>netviz-&lt;version&gt;-darwin-arm64 / amd64.tar.gz</em>
-          </a>
-          <a class="dl" href="https://github.com/Spillers-Technology/netviz/releases/latest">
             <b>Linux</b>
             <span>Extract and run <code>./netviz/netviz</code></span>
             <em>netviz-&lt;version&gt;-linux-amd64.tar.gz</em>
           </a>
         </div>
         <p class="dlNote">
-          Early FOSS builds aren't code-signed yet. On first launch, Windows
-          SmartScreen (More info → Run anyway) or macOS Gatekeeper (right-click →
-          Open) may need a confirmation. Every archive also ships the
+          Windows builds are code-signed and timestamped; Windows SmartScreen may
+          still ask for a confirmation (More info → Run anyway) until the app
+          builds reputation. The Linux build is not signed: check it against its
+          SHA-256 file. There is no prebuilt macOS download yet; NetViz builds
+          from source on macOS. Every archive also ships the
           <code>netviz-cli</code> command-line scanner and a SHA-256 checksum.
         </p>
       </section>
@@ -478,8 +475,8 @@ netviz-cli diff</code></pre>
           <li><b>v0.2.0</b><span>Desktop probe management GUI, release updater, and a colorblind-validated visual pass.</span></li>
           <li><b>v0.3.0</b><span>Self-hosted server: probe ingest, Docker image on GHCR, and the interactive web network map.</span></li>
           <li><b>v0.4.0</b><span>IEEE OUI vendor database, per-device history, in-place updates, emoji device icons.</span></li>
-          <li class="current"><b>v0.9.x — now</b><span>OIDC SSO for the server, the stability freeze, fully self-contained updates, and desktop UX fixes — the 1.0 release candidate.</span></li>
-          <li><b>v1.0.0</b><span>Signed and notarized builds on the frozen v0.9 feature set.</span></li>
+          <li><b>v0.9.x</b><span>OIDC SSO for the server, the stability freeze, fully self-contained updates, and desktop UX fixes.</span></li>
+          <li class="current"><b>v1.0.0 — now</b><span>Signed Windows builds on the frozen v0.9 feature set. macOS archives and notarization are deferred.</span></li>
         </ol>
       </section>
     </main>
