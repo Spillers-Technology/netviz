@@ -380,8 +380,11 @@ validation pass. The stability commitments shipped with v0.9.0:
 
 Remaining for 1.0.0:
 
-- Windows code signing (EV/OV certificate) and macOS notarization (Apple
-  Developer ID) wired into the release workflow.
+- Windows code signing: wired into the release workflow with Azure Artifact
+  Signing (see [RELEASING.md](RELEASING.md#windows-code-signing)); the first
+  signed Windows release is still to ship. This replaced the EV/OV certificate
+  plan; no certificate purchase was needed.
+- macOS notarization (Apple Developer ID) wired into the release workflow.
 - One live sign-in validation against the production IdP.
 - Screenshot refresh and final docs pass.
 

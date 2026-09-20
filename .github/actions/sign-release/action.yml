@@ -1,0 +1,116 @@
+name: Sign and verify release binaries
+description: >
+  Signs the given Windows executables with Azure Artifact Signing, then fails
+  unless every one carries a valid, timestamped Authenticode signature from the
+  expected certificate profile. Shared by the release workflow and the signing
+  check, so a dry run exercises exactly what a release does.
+
+  Reference implementation: spilloid/spoolsmith .github/actions/sign-release
+  (see docs/code-signing.md there). This copy takes the files to sign as an
+  input; spoolsmith's signs a fixed pair.
+
+inputs:
+  client-id:
+    description: Client ID of the app registration trusted by the federated credential.
+    required: true
+  tenant-id:
+    description: Azure tenant ID.
+    required: true
+  subscription-id:
+    description: Azure subscription ID.
+    required: true
+  endpoint:
+    description: Regional Artifact Signing endpoint; must match the account's region.
+    required: true
+  account:
+    description: Artifact Signing account name.
+    required: true
+  profile:
+    description: Certificate profile name.
+    required: true
+  files:
+    description: Files to sign, one per line, relative to the workspace.
+    required: true
+  expected-subject:
+    description: Substring the signer subject must contain. Empty skips the subject check.
+    required: false
+    default: ''
+  verify-script:
+    description: Path to verify-signature.ps1, relative to the workspace.
+    required: false
+    default: scripts/verify-signature.ps1
+
+runs:
+  using: composite
+  steps:
+    # The signing action wants absolute paths; resolve and check them here so a
+    # missing binary fails with its name rather than deep inside SignTool.
+    - name: Resolve files to sign
+      id: resolve
+      shell: pwsh
+      env:
+        FILES: ${{ inputs.files }}
+      run: |
+        $paths = $env:FILES -split '[\r\n,]+' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+        if (-not $paths) { throw 'No files were given to sign.' }
+        $absolute = foreach ($path in $paths) {
+          $full = [IO.Path]::GetFullPath((Join-Path $env:GITHUB_WORKSPACE $path))
+          if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { throw "Cannot sign '$path': $full does not exist." }
+          $full
+        }
+        $delimiter = 'EOF_' + [guid]::NewGuid().ToString('N')
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "absolute<<$delimiter"
+        $absolute | ForEach-Object { Add-Content -Path $env:GITHUB_OUTPUT -Value $_ }
+        Add-Content -Path $env:GITHUB_OUTPUT -Value $delimiter
+        Write-Host "Signing $(@($absolute).Count) file(s):"
+        $absolute | ForEach-Object { Write-Host "  $_" }
+
+    # Needs `id-token: write` on the calling job for the OIDC exchange, and the
+    # Azure CLI on the runner: azure/login leaves an Azure CLI session.
+    - name: Azure login
+      uses: azure/login@v3
+      with:
+        client-id: ${{ inputs.client-id }}
+        tenant-id: ${{ inputs.tenant-id }}
+        subscription-id: ${{ inputs.subscription-id }}
+
+    - name: Sign binaries
+      uses: azure/artifact-signing-action@v2
+      with:
+        endpoint: ${{ inputs.endpoint }}
+        signing-account-name: ${{ inputs.account }}
+        certificate-profile-name: ${{ inputs.profile }}
+        files: ${{ steps.resolve.outputs.absolute }}
+        file-digest: SHA256
+        # Signing certificates are valid for three days; without this
+        # countersignature the release stops verifying almost immediately.
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
+        # azure/login leaves an Azure CLI session authenticated through the OIDC
+        # federated credential; it does not export AZURE_* variables or a token
+        # file. So the Azure CLI credential is the only one that can succeed
+        # here, and the rest are excluded so a failure names the real problem
+        # instead of listing sources that were never configured.
+        exclude-environment-credential: true
+        exclude-workload-identity-credential: true
+        exclude-managed-identity-credential: true
+        exclude-shared-token-cache-credential: true
+        exclude-visual-studio-credential: true
+        exclude-visual-studio-code-credential: true
+        exclude-azure-cli-credential: false
+        exclude-azure-powershell-credential: true
+        exclude-azure-developer-cli-credential: true
+        exclude-interactive-browser-credential: true
+
+    # Fails the job if a binary came back unsigned or without a timestamp,
+    # rather than discovering it once users cannot launch the download.
+    - name: Verify signatures
+      shell: pwsh
+      env:
+        SIGNED_FILES: ${{ steps.resolve.outputs.absolute }}
+        EXPECTED_SUBJECT: ${{ inputs.expected-subject }}
+        VERIFY_SCRIPT: ${{ inputs.verify-script }}
+      run: |
+        $files = $env:SIGNED_FILES -split '\r?\n' | Where-Object { $_ }
+        & (Join-Path $env:GITHUB_WORKSPACE $env:VERIFY_SCRIPT) -Files $files -ExpectedSubject $env:EXPECTED_SUBJECT
+        if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { exit $LASTEXITCODE }

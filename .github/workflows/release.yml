@@ -124,6 +124,14 @@ jobs:
   build-windows:
     name: Build release (Windows)
     runs-on: [self-hosted, Windows]
+    # The federated credential trusts exactly this repository's release
+    # environment, so a published release (which runs as its tag) and a manual
+    # run (which runs as the default branch) authenticate the same way. The
+    # environment only accepts the default branch and v* tags.
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
     env:
       RUNNER_TOOL_CACHE: C:\actions-toolcache
       AGENT_TOOLSDIRECTORY: C:\actions-toolcache
@@ -132,6 +140,27 @@ jobs:
       - name: Prepare tool cache
         shell: pwsh
         run: New-Item -ItemType Directory -Force $env:RUNNER_TOOL_CACHE | Out-Null
+      # Fails before anything is built, and refuses to fall back to an unsigned
+      # Windows release if signing is misconfigured.
+      - name: Require signing configuration
+        shell: pwsh
+        env:
+          SIGNING_ENDPOINT: ${{ vars.SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT: ${{ vars.SIGNING_ACCOUNT }}
+          SIGNING_PROFILE: ${{ vars.SIGNING_PROFILE }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          $missing = @('SIGNING_ENDPOINT', 'SIGNING_ACCOUNT', 'SIGNING_PROFILE',
+                       'AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID') |
+            Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) }
+          if ($missing) {
+            throw "Code signing is not configured; missing: $($missing -join ', '). Set them under Settings > Environments > release. Windows releases are never published unsigned. See RELEASING.md."
+          }
+          if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+            throw 'The Azure CLI is not installed on this runner; azure/login needs it. See RELEASING.md > Runner Tooling.'
+          }
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.x"
@@ -169,6 +198,23 @@ jobs:
           Push-Location desktop
           wails build
           Pop-Location
+      # Signed before staging so the archive, and the SHA-256 the updater checks
+      # against it, describe the signed binaries and not the unsigned ones.
+      - name: Sign and verify binaries
+        uses: ./.github/actions/sign-release
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          endpoint: ${{ vars.SIGNING_ENDPOINT }}
+          account: ${{ vars.SIGNING_ACCOUNT }}
+          profile: ${{ vars.SIGNING_PROFILE }}
+          expected-subject: ${{ vars.SIGNING_EXPECTED_SUBJECT }}
+          files: |
+            dist/bin/netviz-cli.exe
+            dist/bin/netviz-server.exe
+            dist/bin/netviz-probe.exe
+            desktop/build/bin/netviz.exe
       - name: Stage archive
         shell: pwsh
         run: |
