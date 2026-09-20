@@ -35,6 +35,17 @@ Windows runners must use a tool cache path without spaces. The workflows set
 Windows jobs because setup actions can fail when the runner lives under paths
 such as `C:\Program Files\...`.
 
+The `Windows` runner also needs what code signing uses (see
+[Windows Code Signing](#windows-code-signing)):
+
+- PowerShell 7 (`pwsh`), which every Windows step already runs in
+- The **Azure CLI** (`az`) on `PATH`: `azure/login` authenticates through it, and
+  so does the signing action after it
+- The .NET 8 runtime, which the Artifact Signing client library needs
+- Outbound HTTPS to Azure, to `timestamp.acs.microsoft.com` (the timestamp
+  countersignature) and to NuGet, from which the signing action fetches SignTool
+  and its client library at run time
+
 ## Release Assets
 
 When a GitHub Release is published, `.github/workflows/release.yml` builds and
@@ -69,6 +80,52 @@ usage is documented at the top of that file. Every release must ship its
 platform archives; do not publish a release without them. macOS archives still
 require a Mac.
 
+**That fallback cannot sign.** It cross-compiles the Windows executables from
+Linux, and Authenticode signing happens on the Windows runner. A Windows archive
+from `Dockerfile.release` is unsigned, so it must not be published as a release
+asset once releases are signed; bring the Windows runner back instead, or sign the
+executables by hand (below) before archiving.
+
+## Windows Code Signing
+
+The Windows executables (`netviz.exe`, `netviz-cli.exe`, `netviz-server.exe`,
+`netviz-probe.exe`) are Authenticode-signed with
+[Azure Artifact Signing](https://learn.microsoft.com/azure/artifact-signing/).
+The `build-windows` job signs them after building and before staging the archive,
+so the zip and the SHA-256 the updater verifies describe the signed binaries. The
+job fails rather than publish anything it could not sign.
+
+- **Identity.** The workflow authenticates to Azure over OIDC with a federated
+  credential; no secret is stored. It trusts exactly this repository's `release`
+  environment, so only a job that declares `environment: release` can sign, and
+  that environment accepts only `main` and `v*` tags.
+- **Configuration** lives on the `release` environment (Settings → Environments):
+  variables `SIGNING_ENDPOINT`, `SIGNING_ACCOUNT`, `SIGNING_PROFILE`,
+  `SIGNING_EXPECTED_SUBJECT` and secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+  `AZURE_SUBSCRIPTION_ID`. The Azure side and these values were created by
+  `scripts/setup-signing.ps1` in [spilloid/spoolsmith](https://github.com/spilloid/spoolsmith),
+  which documents the whole setup in its `docs/code-signing.md`.
+- **Try it without releasing.** Run the `Signing check` workflow
+  (`gh workflow run signing-check.yml`). It builds and signs the same four
+  executables and publishes nothing. Add `-f hosted=true` to run it on a
+  GitHub-hosted runner, which tells a broken signing identity apart from a
+  self-hosted runner that is missing a prerequisite.
+- **Verify a download** with nothing installed but Windows:
+
+  ```powershell
+  ./scripts/verify-signature.ps1 -Files netviz/netviz.exe, netviz/bin/netviz-cli.exe
+  ```
+
+  Without a checkout, `Get-AuthenticodeSignature .\netviz.exe | Format-List Status,
+  SignerCertificate` shows the same thing for one file. Every file must report a
+  valid signature from the expected publisher, with a timestamp. The timestamp matters: Artifact Signing certificates last three
+  days, so an untimestamped signature looks fine on release day and stops
+  verifying a few days later.
+- **macOS and Linux are not signed.** This covers Windows only; macOS notarization
+  is separate and still open (see [MILESTONES.md](MILESTONES.md)).
+- **The publisher is an individual.** The certificate names its subject as an
+  individual, so Windows shows that person as the publisher, not an organization.
+
 ## Release Checklist (every release)
 
 Code health:
@@ -101,7 +158,11 @@ Publishing:
 - Tag `vX.Y.Z` on main; publish the GitHub Release (tag push publishes the
   Docker image; the release event builds platform archives)
 - Confirm self-hosted runners are online — queued jobs mean a runner is down
+- Run the `Signing check` workflow and confirm it passes before tagging
 - Confirm each platform archive and its `.sha256` attach to the release
+- Download the published Windows zip, extract it, and run
+  `scripts/verify-signature.ps1` on `netviz.exe` and every `bin/*.exe` — CI
+  verifies what it built; this verifies what users actually get
 - Release notes mention authorized-use-only scanning
 
 ## v0.1.0 Checklist

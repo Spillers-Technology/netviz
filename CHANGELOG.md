@@ -6,6 +6,25 @@ kept in the repo root as a historical record; that practice was retired
 starting with v0.3.0 in favor of this file. See [RELEASING.md](RELEASING.md)
 for the release process.
 
+## Unreleased
+
+Added:
+
+- Windows code signing in the release workflow. The `build-windows` job
+  Authenticode-signs `netviz.exe`, `netviz-cli.exe`, `netviz-server.exe` and
+  `netviz-probe.exe` with Azure Artifact Signing before staging the archive, and
+  fails rather than publish a Windows release it could not sign. Takes effect
+  with the next release; releases through v0.9.5 are unsigned.
+- A `Signing check` workflow that builds, signs and verifies the Windows
+  executables without publishing anything, and `scripts/verify-signature.ps1` for
+  checking a signature with nothing installed but Windows.
+
+Changed:
+
+- `RELEASING.md` documents the signing setup, the Azure CLI the Windows runner
+  now needs, and that the `deploy/Dockerfile.release` fallback cannot produce a
+  signed Windows archive.
+
 ## v0.9.5 — 2026-07-10
 
 Release-readiness pass for the v0.9 desktop build.

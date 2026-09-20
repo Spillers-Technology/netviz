@@ -1,0 +1,101 @@
+name: Signing check
+
+# Proves Windows code signing works end to end without publishing anything: builds
+# the same four executables the release ships, signs them through the same
+# composite action a release uses, verifies them, and keeps them as a one-day
+# workflow artifact. Nothing is attached to a release.
+#
+# Run it after changing signing configuration or the Windows runner, and before
+# tagging a release, so a broken credential or a runner missing the Azure CLI
+# shows up now and not on release day:
+#
+#   gh workflow run signing-check.yml
+#
+# It runs on the self-hosted Windows runner, like the release, because that is
+# what it has to prove. The `hosted` input runs it on a GitHub-hosted runner
+# instead, which separates "the signing identity is broken" from "the runner is
+# missing a prerequisite" when a self-hosted run fails.
+on:
+  workflow_dispatch:
+    inputs:
+      hosted:
+        description: Run on a GitHub-hosted Windows runner instead of the self-hosted one
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  sign:
+    name: Sign and verify (no release)
+    runs-on: ${{ fromJSON(inputs.hosted && '"windows-latest"' || '["self-hosted","Windows"]') }}
+    # Same environment as the release job: the federated credential trusts
+    # exactly the release environment of this repository.
+    environment: release
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Setup actions can fail when the runner lives under a path with spaces, so
+      # the self-hosted release job points the tool cache at a plain path. A
+      # GitHub-hosted runner has its own and must be left alone.
+      - name: Use a tool cache path without spaces
+        if: ${{ !inputs.hosted }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force C:\actions-toolcache | Out-Null
+          "RUNNER_TOOL_CACHE=C:\actions-toolcache" >> $env:GITHUB_ENV
+          "AGENT_TOOLSDIRECTORY=C:\actions-toolcache" >> $env:GITHUB_ENV
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build Go binaries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/bin | Out-Null
+          go build -o dist/bin/netviz-cli.exe ./cmd/netviz-cli
+          go build -o dist/bin/netviz-server.exe ./cmd/netviz-server
+          go build -o dist/bin/netviz-probe.exe ./cmd/netviz-probe
+
+      - name: Build desktop app
+        shell: pwsh
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+          npm ci --prefix desktop/frontend
+          npm run --prefix desktop/frontend build
+          $env:PATH = "$env:USERPROFILE\go\bin;$env:PATH"
+          Push-Location desktop
+          wails build
+          Pop-Location
+
+      - name: Sign and verify binaries
+        uses: ./.github/actions/sign-release
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          endpoint: ${{ vars.SIGNING_ENDPOINT }}
+          account: ${{ vars.SIGNING_ACCOUNT }}
+          profile: ${{ vars.SIGNING_PROFILE }}
+          expected-subject: ${{ vars.SIGNING_EXPECTED_SUBJECT }}
+          files: |
+            dist/bin/netviz-cli.exe
+            dist/bin/netviz-server.exe
+            dist/bin/netviz-probe.exe
+            desktop/build/bin/netviz.exe
+
+      - name: Keep the signed binaries for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-binaries
+          path: |
+            dist/bin/*.exe
+            desktop/build/bin/netviz.exe
+          retention-days: 1
