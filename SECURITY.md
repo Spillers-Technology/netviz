@@ -57,8 +57,9 @@ holds an API key.
   network inventory, not credentials.
 - The updater downloads release archives from GitHub over HTTPS, verifies
   the release `.sha256` checksum before install, and keeps the previous
-  binary as a `.old` backup. Binaries are not yet code-signed; signing and
-  notarization are the remaining v1.0.0 gate.
+  binary as a `.old` backup. Windows binaries are Authenticode-signed from
+  v1.0.0; the Linux archive is not signed, and no macOS archive is published
+  (notarization is deferred).
 
 ## Wire contract
 

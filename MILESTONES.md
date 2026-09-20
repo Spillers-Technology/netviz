@@ -370,7 +370,7 @@ Deferred:
 
 ## v1.0.0: Signed Release on the Frozen v0.9 Feature Set
 
-Goal: v1.0.0 is v0.9.x plus trust: signed/notarized binaries and a final
+Goal: v1.0.0 is v0.9.x plus trust: signed Windows binaries and a final
 validation pass. The stability commitments shipped with v0.9.0:
 
 - Probe contract v1 frozen and documented (SECURITY.md, `internal/anchordesk`).
@@ -378,15 +378,25 @@ validation pass. The stability commitments shipped with v0.9.0:
   file formats, SQLite schema migration).
 - Security posture and threat model documented (SECURITY.md).
 
-Remaining for 1.0.0:
+Status: prepared September 20, 2026; ships when the v1.0.0 release is published.
 
-- Windows code signing: wired into the release workflow with Azure Artifact
-  Signing (see [RELEASING.md](RELEASING.md#windows-code-signing)); the first
-  signed Windows release is still to ship. This replaced the EV/OV certificate
-  plan; no certificate purchase was needed.
-- macOS notarization (Apple Developer ID) wired into the release workflow.
-- One live sign-in validation against the production IdP.
-- Screenshot refresh and final docs pass.
+Shipped in 1.0.0:
+
+- Windows code signing with Azure Artifact Signing (see
+  [RELEASING.md](RELEASING.md#windows-code-signing)): the four Windows
+  executables are Authenticode-signed and timestamped, and a `Release guard`
+  workflow moves any release with an unsigned Windows build back to draft. This
+  replaced the EV/OV certificate plan; no certificate purchase was needed.
+
+Deferred (not done for 1.0.0):
+
+- macOS archive and notarization (Apple Developer ID): no macOS runner is
+  available, so v1.0.0 ships Windows and Linux archives only. macOS builds from
+  source.
+- Signing for the Linux archive.
+- One live sign-in validation against the production IdP (OIDC is covered by
+  in-process issuer tests; see v0.9.0).
+- Screenshot refresh and a final docs pass.
 
 Acceptance criteria:
 

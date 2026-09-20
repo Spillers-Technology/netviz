@@ -3,10 +3,10 @@
 
 **See everything on your local network — in seconds, with one download.**
 
-**Current release: v0.9.5.**
+**Current release: v1.0.0.**
 
-NetViz is a free, open-source LAN scanner and network visualizer for Windows,
-macOS, and Linux. Point it at your network, hit scan, and watch devices appear
+NetViz is a free, open-source LAN scanner and network visualizer for Windows and
+Linux (macOS builds from source). Point it at your network, hit scan, and watch devices appear
 live as tables, a grouped graph, and a clickable hierarchy map. It's a modern
 take on tools like Advanced IP Scanner and Angry IP Scanner, built on a fast
 native Go scan engine.
@@ -27,7 +27,6 @@ desktop app is ready to run, no toolchain required.
 | Platform | Download | Run |
 | --- | --- | --- |
 | **Windows** | `netviz-<version>-windows-amd64.zip` | Unzip, run **`netviz.exe`** in the extracted folder |
-| **macOS** | `netviz-<version>-darwin-arm64.tar.gz` (Apple Silicon) or `-amd64` (Intel) | Extract, then open **`netviz/netviz.app`** |
 | **Linux** | `netviz-<version>-linux-amd64.tar.gz` | Extract, then run **`./netviz/netviz`** |
 
 Each archive also bundles the `netviz-cli` command-line scanner (see
@@ -36,15 +35,19 @@ download.
 
 ### First-launch notes
 
-These are early FOSS builds and aren't code-signed yet, so your OS may warn you
-the first time:
+Windows builds are Authenticode-signed (Azure Artifact Signing) and timestamped.
+The Linux build is not signed. Your OS may still warn you the first time:
 
-- **Windows** — SmartScreen may show "Windows protected your PC." Click **More
-  info → Run anyway**.
-- **macOS** — Gatekeeper may say the app is from an unidentified developer.
-  **Right-click `netviz.app` → Open**, then confirm. (Or `xattr -dr
-  com.apple.quarantine netviz.app`.)
-- **Linux** — make sure the binary is executable: `chmod +x netviz/netviz`.
+- **Windows** — the executables carry a valid signature, but SmartScreen can
+  still show "Windows protected your PC" for a newly published app until it has
+  built reputation. Click **More info → Run anyway**, or check the signature
+  first with `Get-AuthenticodeSignature .\netviz.exe | Format-List Status,
+  SignerCertificate` (Status must be `Valid`).
+- **Linux** — make sure the binary is executable: `chmod +x netviz/netviz`. The
+  desktop app needs GTK 3 and WebKitGTK 4.1 (`libwebkit2gtk-4.1`).
+- **macOS** — no prebuilt macOS archive is published for v1.0.0. NetViz builds
+  from source on macOS (see [Build from source](#build-from-source)); signed and
+  notarized macOS builds are deferred.
 
 ---
 
@@ -156,6 +159,9 @@ people should just [download a release](#download).
 
 **Prerequisites:** Go 1.25+, Node.js + npm, and the
 [Wails v2](https://wails.io/) CLI.
+
+On Linux distributions that ship only WebKitGTK 4.1 (Debian 13, Ubuntu 24.04+),
+add `-tags webkit2_41` to `wails dev` and `wails build`.
 
 ```sh
 # Run the desktop app in dev mode
@@ -269,8 +275,9 @@ Future consumers    websocket event streamer
 - **v0.4.0** — vendor enrichment (IEEE OUI), per-device history, updater
   in-place install, emoji device icons
 - **v0.9.x** — server sign-in with OIDC SSO, stability-freeze docs,
-  self-contained updates, and desktop UX fixes *(current)*
-- **v1.0.0** — signed/notarized binaries on the frozen v0.9 feature set
+  self-contained updates, and desktop UX fixes
+- **v1.0.0** — Windows binaries signed with Azure Artifact Signing, on the frozen
+  v0.9 feature set *(current)*
 
 See [MILESTONES.md](MILESTONES.md) for acceptance criteria,
 [CHANGELOG.md](CHANGELOG.md) for release notes, and

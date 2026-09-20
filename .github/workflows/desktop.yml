@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [Linux, macOS]
+        os: [Linux]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -32,7 +32,8 @@ jobs:
         shell: bash
         run: |
           export PATH="$HOME/go/bin:$PATH"
-          wails build
+          # Debian 13 and Ubuntu 24.04+ ship WebKitGTK 4.1 only; Wails links 4.0 by default.
+          wails build -tags webkit2_41
 
   build-windows:
     name: Build desktop (Windows)

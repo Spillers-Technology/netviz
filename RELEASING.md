@@ -12,7 +12,6 @@ Release builds target the standard self-hosted OS labels:
 
 - `self-hosted`, `Linux`
 - `self-hosted`, `Windows`
-- `self-hosted`, `macOS`
 
 GitHub Actions cannot dynamically skip missing self-hosted runner labels before a
 job is queued. If one OS is not available, that job will remain queued until a
@@ -29,6 +28,14 @@ Each release runner should be able to install or run:
 
 The Linux Docker publishing workflow also requires Docker/Buildx support on a
 `self-hosted`, `Linux` runner.
+
+The `Linux` runner also needs the GTK 3 and WebKitGTK 4.1 development packages
+for the Wails desktop build: `libgtk-3-dev` and `libwebkit2gtk-4.1-dev` on
+Debian 13 / Ubuntu 24.04+. Those distributions have no `webkit2gtk-4.0`, which
+is why the Linux builds pass `-tags webkit2_41` to `wails build`. The current
+Linux runner is an unprivileged LXC container (Debian 13, nesting enabled for
+Docker) on a Proxmox host, running the runner as a dedicated `runner` user under
+systemd.
 
 Windows runners must use a tool cache path without spaces. The workflows set
 `RUNNER_TOOL_CACHE` and `AGENT_TOOLSDIRECTORY` to `C:\actions-toolcache` for
@@ -52,7 +59,6 @@ When a GitHub Release is published, `.github/workflows/release.yml` builds and
 uploads:
 
 - `netviz-<tag>-linux-<arch>.tar.gz`
-- `netviz-<tag>-darwin-<arch>.tar.gz`
 - `netviz-<tag>-windows-<arch>.zip`
 - matching `.sha256` files
 
@@ -77,8 +83,8 @@ for an existing release.
 When self-hosted runners are unavailable, `deploy/Dockerfile.release` builds
 the Linux and Windows archives (plus `.sha256` files) from any Docker host —
 usage is documented at the top of that file. Every release must ship its
-platform archives; do not publish a release without them. macOS archives still
-require a Mac.
+platform archives; do not publish a release without them. There is no macOS runner,
+so no macOS archive is published.
 
 **That fallback cannot sign.** It cross-compiles the Windows executables from
 Linux, and Authenticode signing happens on the Windows runner. A Windows archive
@@ -131,8 +137,9 @@ job fails rather than publish anything it could not sign.
   and from the desktop updater. Fix the assets and publish again. It cannot stop an
   upload, only what stays public: assets are attached after publishing. Re-run it
   by hand with `gh workflow run release-guard.yml -f tag=vX.Y.Z`.
-- **macOS and Linux are not signed, and not covered by the guard.** macOS
-  notarization is separate and still open (see [MILESTONES.md](MILESTONES.md)).
+- **Linux is not signed, and not covered by the guard.** There is no macOS
+  archive: no macOS runner is available, and notarization is deferred (see
+  [MILESTONES.md](MILESTONES.md)).
 - **The publisher is an individual.** The certificate names its subject as an
   individual, so Windows shows that person as the publisher, not an organization.
 
@@ -182,7 +189,7 @@ Publishing:
 - `npm run --prefix desktop/frontend build`
 - `npm run --prefix web build`
 - `wails build` on available desktop platforms
-- Build `netviz-probe` for Windows, Linux, and macOS
+- Build `netviz-probe` for Windows and Linux
 - Install/start/status/stop/uninstall the probe on each release platform
 - Run the probe twice against AnchorDesk and confirm the first ingest
   creates devices while the second updates the same devices without duplicates
