@@ -121,8 +121,18 @@ job fails rather than publish anything it could not sign.
   valid signature from the expected publisher, with a timestamp. The timestamp matters: Artifact Signing certificates last three
   days, so an untimestamped signature looks fine on release day and stops
   verifying a few days later.
-- **macOS and Linux are not signed.** This covers Windows only; macOS notarization
-  is separate and still open (see [MILESTONES.md](MILESTONES.md)).
+- **Only signed builds stay on a release.** The `Release guard` workflow
+  (`.github/workflows/release-guard.yml`) runs on a GitHub-hosted runner after
+  `Release Builds` finishes, and on publish. It downloads every `.zip`/`.exe`/`.msi`
+  asset, checks the zip against its `.sha256`, and verifies every executable inside
+  with `scripts/verify-signature.ps1` against `SIGNING_EXPECTED_SUBJECT`. If a
+  Windows archive is missing, unsigned, untimestamped or signed by the wrong
+  publisher, it moves the release back to **draft**, which hides it from the public
+  and from the desktop updater. Fix the assets and publish again. It cannot stop an
+  upload, only what stays public: assets are attached after publishing. Re-run it
+  by hand with `gh workflow run release-guard.yml -f tag=vX.Y.Z`.
+- **macOS and Linux are not signed, and not covered by the guard.** macOS
+  notarization is separate and still open (see [MILESTONES.md](MILESTONES.md)).
 - **The publisher is an individual.** The certificate names its subject as an
   individual, so Windows shows that person as the publisher, not an organization.
 
