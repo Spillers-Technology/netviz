@@ -19,6 +19,11 @@ Added:
   executables without publishing anything, and `scripts/verify-signature.ps1` for
   checking a signature with nothing installed but Windows.
 
+- A `Release guard` workflow that verifies the assets on a published release and
+  moves the release back to draft if any Windows executable is unsigned,
+  untimestamped or signed by the wrong publisher, or the Windows archive is
+  missing or does not match its `.sha256`.
+
 Changed:
 
 - `RELEASING.md` documents the signing setup, the Azure CLI the Windows runner

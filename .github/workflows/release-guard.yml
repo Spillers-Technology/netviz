@@ -1,0 +1,150 @@
+name: Release guard
+
+# Only signed Windows builds may stay attached to a public release.
+#
+# Assets are attached after a release is published, so this cannot stop an
+# unsigned build being uploaded; it verifies what actually landed and, if any
+# Windows executable is unsigned, untimestamped or signed by the wrong publisher
+# (or the Windows archive is missing or does not match its .sha256), moves the
+# release back to draft. A draft is invisible to the public and to the desktop
+# updater, and is reversible: fix the assets, then publish again.
+#
+# Runs on a GitHub-hosted runner on purpose: verification only needs
+# Get-AuthenticodeSignature, and a guard that shares the self-hosted runner it
+# polices would be down whenever that runner is.
+#
+# macOS and Linux archives are not covered: neither has a signing story yet.
+on:
+  # The Release Builds run is what attaches the archives, so it is the moment to
+  # check them. Runs from the default branch's copy of this file.
+  workflow_run:
+    workflows: ["Release Builds"]
+    types: [completed]
+  # Catches a release published with assets already attached by hand, such as
+  # the deploy/Dockerfile.release fallback. Assets that have not been built yet
+  # are fine here; unsigned ones are not.
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to verify
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-guard-${{ inputs.tag || github.event.release.tag_name || github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify release assets are signed
+    runs-on: windows-latest
+    # Read SIGNING_EXPECTED_SUBJECT from the release environment; nothing is
+    # authenticated to Azure and no secret is used.
+    environment: release
+    timeout-minutes: 30
+    steps:
+      # Default branch, so the verifier is the reviewed one and never something
+      # a release tag carries.
+      - uses: actions/checkout@v4
+
+      - name: Verify and, on failure, draft the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          EXPECTED_SUBJECT: ${{ vars.SIGNING_EXPECTED_SUBJECT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+
+          if ([string]::IsNullOrWhiteSpace($env:EXPECTED_SUBJECT)) {
+            throw 'SIGNING_EXPECTED_SUBJECT is not set on the release environment; refusing to verify without knowing the expected publisher.'
+          }
+
+          # Which release? A tag from the event when there is one. A manual
+          # rebuild (Release Builds workflow_dispatch) runs on a branch, so its
+          # tag is not in the event; fall back to the newest published release.
+          $tag = @($env:INPUT_TAG, $env:RELEASE_TAG, $(if ($env:RUN_BRANCH -match '^v\d') { $env:RUN_BRANCH })) |
+            Where-Object { $_ } | Select-Object -First 1
+          if (-not $tag) {
+            $tag = gh release list --repo $env:REPO --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not list releases.' }
+          }
+          if (-not $tag) { throw 'No release to verify.' }
+          Write-Host "Verifying release $tag"
+
+          $release = gh release view $tag --repo $env:REPO --json assets,isDraft | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "Could not read release $tag." }
+          if ($release.isDraft) { Write-Host "$tag is already a draft; nothing to guard."; return }
+
+          # The release event fires before any archive is built. Everything
+          # else (Release Builds finished, or a manual check) must have a
+          # Windows archive by now.
+          $requireWindows = $env:EVENT -ne 'release'
+          $failures = [System.Collections.Generic.List[string]]::new()
+
+          $binaryAssets = @($release.assets | Where-Object { $_.name -match '\.(zip|exe|msi)$' })
+          $windowsZips  = @($binaryAssets | Where-Object { $_.name -match '-windows-.*\.zip$' })
+          if ($requireWindows -and -not $windowsZips) {
+            $failures.Add("No Windows archive (netviz-$tag-windows-<arch>.zip) is attached. Every release must ship a signed one.")
+          }
+
+          $work = Join-Path $env:RUNNER_TEMP 'release-guard'
+          New-Item -ItemType Directory -Force $work | Out-Null
+
+          foreach ($asset in $binaryAssets) {
+            $name = $asset.name
+            $file = Join-Path $work $name
+            gh release download $tag --repo $env:REPO --pattern $name --dir $work --clobber
+            if ($LASTEXITCODE -ne 0) { $failures.Add("$name - could not be downloaded."); continue }
+
+            $targets = @()
+            if ($name -like '*.zip') {
+              # The updater trusts the .sha256, so it has to describe this zip.
+              $shaAsset = $release.assets | Where-Object { $_.name -eq "$name.sha256" }
+              if (-not $shaAsset) {
+                $failures.Add("$name - has no matching $name.sha256.")
+              } else {
+                gh release download $tag --repo $env:REPO --pattern "$name.sha256" --dir $work --clobber
+                $expected = ((Get-Content (Join-Path $work "$name.sha256") -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+                $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+                if ($expected -ne $actual) { $failures.Add("$name - SHA-256 is $actual but $name.sha256 says $expected.") }
+              }
+              $dest = Join-Path $work ([IO.Path]::GetFileNameWithoutExtension($name))
+              Expand-Archive -Path $file -DestinationPath $dest -Force
+              $targets = @(Get-ChildItem $dest -Recurse -File | Where-Object { $_.Extension -in '.exe', '.dll', '.msi' } | ForEach-Object FullName)
+              if (-not $targets) { $failures.Add("$name - contains no executables to verify."); continue }
+            } else {
+              $targets = @($file)
+            }
+
+            foreach ($target in $targets) {
+              # Not `& script; $?`: the script throws on failure, and one bad
+              # file must not stop the rest being reported.
+              try {
+                & (Join-Path $env:GITHUB_WORKSPACE 'scripts/verify-signature.ps1') -Files $target -ExpectedSubject $env:EXPECTED_SUBJECT
+              } catch {
+                $failures.Add("$name -> $([IO.Path]::GetFileName($target)): $($_.Exception.Message)")
+              }
+            }
+          }
+
+          if ($failures.Count -eq 0) {
+            Write-Host "Release ${tag}: every Windows binary carries a valid, timestamped signature from '$($env:EXPECTED_SUBJECT)'."
+            return
+          }
+
+          $failures | ForEach-Object { Write-Error $_ -ErrorAction Continue }
+          Write-Host "Release $tag failed signature verification; moving it back to draft."
+          gh release edit $tag --repo $env:REPO --draft
+          if ($LASTEXITCODE -ne 0) { throw "Verification failed AND the release could not be drafted; unpublish $tag by hand now." }
+          throw "Release $tag is not fully signed and has been moved back to draft ($($failures.Count) problem(s))."
