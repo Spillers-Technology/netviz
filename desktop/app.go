@@ -69,6 +69,12 @@ func (a *App) DefaultPorts() []scanner.PortDef {
 	return scanner.DefaultPortDefs
 }
 
+// DetectNetworks lists the private IPv4 networks this machine is on, likeliest
+// first, so the range field can start from the user's own network.
+func (a *App) DetectNetworks() []string {
+	return scanner.LocalNetworks()
+}
+
 func (a *App) startScan(cidr string, ports []int, preserveResults bool) error {
 	if err := scanner.ValidateCIDR(cidr); err != nil {
 		return err
