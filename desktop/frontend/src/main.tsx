@@ -188,6 +188,9 @@ function App() {
   const [history, setHistory] = useState<ScanRun[]>([]);
   const [diff, setDiff] = useState<ScanDiff>({ base_run_id: "", compare_run_id: "" });
   const [tab, setTab] = useState<Tab>("table");
+  const [networkView, setNetworkView] = useState<Tab>("table");
+  const [deviceFilter, setDeviceFilter] = useState("");
+  const networkActive = ["table", "graph", "hierarchy"].includes(tab);
   const [scanning, setScanning] = useState(false);
   const [monitoring, setMonitoring] = useState(false);
   const [showCheckedOnly, setShowCheckedOnly] = useState(false);
@@ -630,7 +633,23 @@ function App() {
   }
 
   return (
-    <main className="shell">
+    <main className="shell appShell">
+      <aside className="appSidebar">
+        <a className="brand" href="#" onClick={(event) => { event.preventDefault(); setTab(networkView); }}>NetViz<span>Network discovery</span></a>
+        <nav className="workspaceNav" aria-label="Workspaces">
+          <button className={networkActive ? "active" : ""} aria-current={networkActive ? "page" : undefined} onClick={() => setTab(networkView)}>Network<span>Discover and inspect devices</span></button>
+          <button className={tab === "history" ? "active" : ""} aria-current={tab === "history" ? "page" : undefined} onClick={() => setTab("history")}>History<span>Compare saved scans</span></button>
+          <button className={tab === "probe" ? "active" : ""} aria-current={tab === "probe" ? "page" : undefined} onClick={() => setTab("probe")}>Probe<span>Keep inventory reporting</span></button>
+        </nav>
+        <div className="sidebarFoot"><button className={tab === "update" ? "active" : ""} aria-current={tab === "update" ? "page" : undefined} onClick={() => setTab("update")}>App updates{updateInfo.available ? " · available" : ""}</button><span>Local scanning · no account required</span></div>
+      </aside>
+      <div className="workspaceContent">
+      <header className="workspaceHeader">
+        <div><p className="eyebrow">Desktop workspace</p><h1>{networkActive ? "Your network" : tab === "history" ? "Scan history" : tab === "probe" ? "Continuous reporting" : "App updates"}</h1><p className="quiet">{networkActive ? "Scan a network, inspect a device, and see what changed." : tab === "history" ? "Revisit observations and compare changes between runs." : tab === "probe" ? "Connect this network to NetViz Server or AnchorDesk." : "Check, download, and review the next release."}</p></div>
+        <div className="activityActions"><span className="activityBadge" role="status">{scanning ? `Scanning ${cidrRef.current}` : monitoring ? "Monitoring active" : "Ready"}</span>{monitoring && <button onClick={toggleMonitor}>Stop monitoring</button>}{scanning && <button onClick={cancelScan}>Cancel scan</button>}</div>
+      </header>
+      {networkActive && <>
+      {rows.length === 0 && !scanning && <section className="gettingStarted"><strong>Start with a network</strong><p>Enter its IPv4 range below, then choose Start Scan. Select a device to inspect its ports and history, or switch views to explore the same results.</p></section>}
       <section className="toolbar" aria-label="Scan controls">
         <div
           className="fileMenu"
@@ -638,7 +657,7 @@ function App() {
             if (!event.currentTarget.contains(event.relatedTarget as Node)) setFileOpen(false);
           }}
         >
-          <button onClick={() => setFileOpen((open) => !open)}>File</button>
+          <button aria-expanded={fileOpen} onClick={() => setFileOpen((open) => !open)}>Scan files</button>
           {fileOpen && (
             <div className="fileMenuList">
               <button onClick={openScan}>Open Scan</button>
@@ -648,7 +667,7 @@ function App() {
           )}
         </div>
         <label className="field">
-          <span>CIDR</span>
+          <span>Network range (CIDR)</span>
           <input
             value={cidr}
             onChange={(event) => setCidr(event.target.value)}
@@ -788,6 +807,8 @@ function App() {
         )}
       </section>
 
+      </>}
+
       {updateInfo.available && tab !== "update" && (
         <section className="updateBanner" aria-label="Update available">
           <span>{updateInfo.message}</span>
@@ -795,18 +816,13 @@ function App() {
         </section>
       )}
 
-      <nav className="tabs" aria-label="Views">
-        {(["table", "graph", "hierarchy", "history", "probe", "update"] as Tab[]).map((view) => (
-          <button
-            key={view}
-            className={tab === view ? "active" : ""}
-            aria-current={tab === view}
-            onClick={() => setTab(view)}
-          >
-            {view[0].toUpperCase() + view.slice(1)}
+      {networkActive && <div className="networkTools"><nav className="tabs" aria-label="Network views">
+        {(["table", "graph", "hierarchy"] as Tab[]).map((view) => (
+          <button key={view} className={tab === view ? "active" : ""} aria-pressed={tab === view} onClick={() => { setNetworkView(view); setTab(view); }}>
+            {view === "table" ? "Devices" : view === "graph" ? "Groups" : "Topology"}
           </button>
         ))}
-      </nav>
+      </nav><label className="searchField"><span>Find a device</span><input type="search" placeholder="IP, name, vendor, port, or state" value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)} /></label>{deviceFilter && <button onClick={() => setDeviceFilter("")}>Clear filter</button>}</div>}
 
       {errors.map((item) => (
         <div className="error" role="alert" key={item.id}>
@@ -817,9 +833,9 @@ function App() {
         </div>
       ))}
 
-      {tab === "table" && <TableView rows={visibleRows} states={deviceStates} hiddenCount={hiddenCheckedOnly} />}
-      {tab === "graph" && <GraphView hosts={visibleRows} states={deviceStates} />}
-      {tab === "hierarchy" && <HierarchyView hosts={visibleRows} states={deviceStates} />}
+      {tab === "table" && <TableView rows={visibleRows} states={deviceStates} hiddenCount={hiddenCheckedOnly} filter={deviceFilter} />}
+      {tab === "graph" && <GraphView hosts={visibleRows.filter((host) => hostMatchesFilter(host, deviceStates[host.ip] || "stable", deviceFilter.trim().toLowerCase()))} states={deviceStates} />}
+      {tab === "hierarchy" && <HierarchyView hosts={visibleRows.filter((host) => hostMatchesFilter(host, deviceStates[host.ip] || "stable", deviceFilter.trim().toLowerCase()))} states={deviceStates} />}
       {tab === "history" && <HistoryView history={history} diff={diff} onRefresh={refreshHistory} onError={pushError} />}
       {tab === "probe" && (
         <ProbeView
@@ -853,6 +869,7 @@ function App() {
           onApply={applyUpdate}
         />
       )}
+      </div>
     </main>
   );
 }
@@ -1161,8 +1178,7 @@ function hostMatchesFilter(host: HostObservation, state: DeviceState, needle: st
     .includes(needle);
 }
 
-function TableView({ rows, states, hiddenCount }: { rows: HostObservation[]; states: Record<string, DeviceState>; hiddenCount: number }) {
-  const [filter, setFilter] = useState("");
+function TableView({ rows, states, hiddenCount, filter }: { rows: HostObservation[]; states: Record<string, DeviceState>; hiddenCount: number; filter: string }) {
   const [sortKey, setSortKey] = useState<SortKey>("ip");
   const [sortAsc, setSortAsc] = useState(true);
   const [selectedIP, setSelectedIP] = useState("");
@@ -1197,19 +1213,7 @@ function TableView({ rows, states, hiddenCount }: { rows: HostObservation[]; sta
     <section className={`tableLayout ${selected ? "withDetail" : ""}`} aria-label="Scan results">
       <div className="tableWrap">
       <div className="tableTools">
-        <input
-          className="tableFilter"
-          type="search"
-          placeholder="Filter by IP, hostname, MAC, vendor, port…"
-          aria-label="Filter scan results"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
-        />
-        {filter.trim() && (
-          <span className="quiet">
-            {visible.length} of {rows.length} match
-          </span>
-        )}
+        <span className="quiet">{visible.length} of {rows.length} devices · select a row to inspect</span>
       </div>
       <table>
         <thead>

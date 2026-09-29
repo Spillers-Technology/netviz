@@ -404,7 +404,8 @@ button.danger:hover:not(:disabled) {
 table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
+  min-width: 1080px;
   font-size: 13px;
 }
 
@@ -1393,3 +1394,74 @@ h4 {
   overflow-wrap: anywhere;
   font-size: 13px;
 }
+/* Workspaces share a visual language; their data and capabilities stay local. */
+:root { --border: #d6dfe8; --border-strong: #8799ad; --text-muted: #52657a; }
+body { min-width: 0; background: #f3f6fa; }
+.shell.appShell { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 0; padding: 0; margin: 0; max-width: none; min-height: 100vh; }
+.appSidebar { display: flex; flex-direction: column; gap: 36px; padding: 32px 16px 20px; background: #12283e; color: #eaf2fa; }
+.brand { display: block; padding: 0 14px; font-size: 27px; font-weight: 700; letter-spacing: -.8px; color: #fff; text-decoration: none; }
+.brand span { display: block; font-size: 12px; font-weight: 400; letter-spacing: .2px; color: #b3c6d8; margin-top: 5px; }
+.workspaceNav { display: grid; gap: 6px; }
+.workspaceNav button, .sidebarFoot button { text-align: left; height: auto; padding: 12px 14px; border: 1px solid transparent; background: transparent; color: #d0deeb; border-radius: 8px; font-weight: 600; }
+.workspaceNav button span { display: block; margin-top: 5px; font-size: 11px; color: #b3c6d8; font-weight: 400; }
+.workspaceNav button:hover, .sidebarFoot button:hover { background: #203d57; color: #fff; }
+.workspaceNav button.active, .sidebarFoot button.active { background: #244d6e; border-color: #427398; color: #fff; }
+.sidebarFoot { display: grid; gap: 12px; margin-top: auto; font-size: 11px; color: #b3c6d8; }
+.sidebarFoot > span { padding: 0 14px; line-height: 1.6; }
+.workspaceContent { min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 30px clamp(16px, 3vw, 44px); }
+.workspaceContent > * { min-width: 0; }
+.workspaceHeader, .topBar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 0 0 8px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.workspaceHeader h1, .topBar h1 { font-size: 28px; font-weight: 650; letter-spacing: -.6px; margin: 0; }
+.eyebrow { margin: 0 0 6px; color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+.activityActions, .topActions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.activityBadge { font-size: 12px; color: #0f6f4f; background: #e4f7ee; padding: 7px 12px; border-radius: 20px; }
+.gettingStarted { padding: 18px 22px; background: #e7f1ff; border: 1px solid #c7dcee; border-radius: 10px; }
+.gettingStarted p { margin: 6px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-muted); max-width: 70ch; }
+.toolbar { padding: 16px; gap: 10px; }
+.status { background: transparent; border: 0; box-shadow: none; padding: 0 2px; font-size: 12px; flex-wrap: wrap; }
+.networkTools { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.networkTools .tabs { display: flex; gap: 3px; padding: 4px; background: #e5ecf3; border: 0; box-shadow: none; }
+.networkTools .tabs button { border: 0; background: transparent; color: var(--text-muted); }
+.networkTools .tabs button.active { background: #fff; color: #0b5cab; box-shadow: 0 1px 4px #12283e18; }
+.searchField { display: grid; gap: 5px; font-size: 11px; color: var(--text-muted); }
+.searchField input, .searchField select { width: 100%; max-width: 100%; height: 36px; border: 1px solid var(--border-strong); border-radius: 6px; padding: 0 10px; font: inherit; font-size: 13px; background: #fff; color: #1f1f1f; }
+.searchField:has(input) { flex: 1 1 220px; max-width: 420px; }
+.tableWrap, .graphWrap, .hierarchyWrap, .probeWrap, .updateWrap, .historyWrap, .mapWrap, .tile { border-radius: 10px; box-shadow: 0 2px 6px #12283e06; }
+.tableLayout, .graphWrap, .hierarchyWrap { flex: 1; }
+.probeOverview { background: #fff; border: 1px solid var(--border); padding: 24px; border-radius: 10px; }
+.probeOverview > .quiet { margin-top: 12px; line-height: 1.7; }
+.probeOverview .emptyState { padding: 28px 0 0; }
+.identity { white-space: normal; overflow-wrap: anywhere; }
+.mapToolbar { flex-wrap: wrap; }
+.mapHint { white-space: normal; }
+.emptyState { line-height: 1.7; }
+@media (max-width: 1100px) {
+  .shell.appShell { grid-template-columns: 180px minmax(0, 1fr); }
+  .workspaceContent { padding: 24px 18px; }
+  .tableLayout.withDetail, .graphWrap, .hierarchyWrap, .probeGrid, .updateGrid, .historyGrid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+  .shell.appShell { grid-template-columns: minmax(0, 1fr); }
+  .appSidebar { padding: 16px; gap: 16px; }
+  .brand { font-size: 22px; padding: 0; }
+  .brand span { display: inline; margin-left: 12px; }
+  .workspaceNav { display: flex; flex-wrap: wrap; gap: 4px; }
+  .workspaceNav button { padding: 9px 12px; }
+  .workspaceNav button span { display: none; }
+  .sidebarFoot { margin: 0; gap: 4px; }
+  .sidebarFoot button { padding: 8px 12px; }
+  .sidebarFoot > span { display: none; }
+  .workspaceContent { padding: 20px 12px; }
+  .workspaceHeader h1, .topBar h1 { font-size: 24px; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile { padding: 12px; }
+  .tileValue { font-size: 23px; overflow-wrap: anywhere; }
+  .portsPanel { width: min(420px, calc(100vw - 48px)); left: auto; right: 0; }
+  .portsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .networkMap, .diffColumns { grid-template-columns: minmax(0, 1fr); }
+  .graphRoot { border-right: 0; border-bottom: 1px solid var(--border); padding: 12px; }
+  .probeHeader, .historyHeader, .updateHeader { flex-wrap: wrap; }
+  .probeStatusGrid { grid-template-columns: minmax(0, 1fr); }
+  .mapCanvas { height: 420px; }
+}
+

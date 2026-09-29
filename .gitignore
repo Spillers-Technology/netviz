@@ -26,5 +26,8 @@ desktop/frontend/package.json.md5
 .env
 .env.*
 
+# Responsive validation artifacts; representative product images live in docs/assets.
+docs/assets/workspaces/
+
 # Stray module-level build output
 desktop/desktop.exe

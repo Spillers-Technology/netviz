@@ -18,10 +18,11 @@ import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { profiles, trackErrors, captureView } from "./validation.mjs";
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
-const outDir = path.join(repoRoot, "docs", "assets");
+const outDir = process.env.NETVIZ_CAPTURE_OUT_DIR || path.join(repoRoot, "docs", "assets", "workspaces");
 const baseUrl = process.env.NETVIZ_CAPTURE_BASE_URL || "http://127.0.0.1:5173";
 const debugCapture = process.env.NETVIZ_CAPTURE_DEBUG === "1";
 
@@ -341,8 +342,12 @@ async function waitForServer() {
 }
 
 async function selectTab(page, label) {
-  await page.locator(`nav.tabs button:has-text("${label}")`).click();
-  await page.waitForTimeout(350);
+  const names = { Table: "Devices", Graph: "Groups", Hierarchy: "Topology", Update: "App updates" };
+  if (["Table", "Graph", "Hierarchy"].includes(label)) {
+    await page.locator(".workspaceNav button").first().click();
+  }
+  await page.getByRole("button", { name: names[label] || label, exact: label !== "Update" && label !== "History" && label !== "Probe" }).first().click();
+  await page.waitForTimeout(150);
 }
 
 async function main() {
@@ -364,8 +369,10 @@ async function main() {
     await waitForServer();
     console.log("Launching Chromium...");
     browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({ viewport: { width: 1440, height: 960 }, deviceScaleFactor: 1.5 });
+    for (const profile of profiles) {
+    const context = await browser.newContext({ viewport: profile, deviceScaleFactor: 1 });
     const page = await context.newPage();
+    const errors = trackErrors(page);
     if (debugCapture) {
       page.on("console", (m) => console.log(`BROWSER ${m.type()}: ${m.text()}`));
       page.on("pageerror", (e) => console.log(`BROWSER pageerror: ${e.message}`));
@@ -379,6 +386,7 @@ async function main() {
     });
     await page.locator("nav.tabs").waitFor({ timeout: 20_000 });
 
+    await captureView(page, errors, path.join(outDir, `desktop-${profile.name}-empty.png`));
     console.log("Replaying scan...");
     await page.evaluate(emitScript());
     await page.locator("table tbody tr").first().waitFor({ timeout: 20_000 });
@@ -408,10 +416,23 @@ async function main() {
       await shot.ready();
       if (shot.after) await shot.after();
       await page.waitForTimeout(250);
-      await page.screenshot({ path: path.join(outDir, shot.file) });
+      await captureView(page, errors, path.join(outDir, `desktop-${profile.name}-${shot.file}`));
     }
 
-    console.log(`Captured ${shots.length} screenshots in ${path.relative(repoRoot, outDir)}`);
+    await selectTab(page, "Table");
+    const search = page.getByRole("searchbox", { name: "Find a device" });
+    await search.fill("192.168.1.42");
+    await selectTab(page, "Graph");
+    if (await search.inputValue() !== "192.168.1.42") throw new Error("Search lost between network views");
+    await captureView(page, errors, path.join(outDir, `desktop-${profile.name}-filtered-groups.png`));
+    await selectTab(page, "History");
+    if (await page.locator(".toolbar").count()) throw new Error("Scan controls leaked into History");
+    await page.locator(".workspaceNav button").first().click();
+    if (!(await page.getByRole("button", { name: "Groups", exact: true }).getAttribute("aria-pressed") === "true")) throw new Error("Network view was not restored");
+    if (await search.inputValue() !== "192.168.1.42") throw new Error("Search lost leaving workspace");
+    await context.close();
+    console.log(`Captured ${profile.name} desktop views`);
+    }
   } finally {
     if (browser) await browser.close();
   }

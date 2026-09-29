@@ -11,6 +11,10 @@ const PROBE_STALE_MS = 5 * 60 * 1000;
 function App() {
   const demo = useMemo(() => new URLSearchParams(window.location.search).has("demo"), []);
   const [state, setState] = useState<ServerState | null>(null);
+  const [view, setView] = useState<"devices" | "map" | "probe">("devices");
+  const [filter, setFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const [identity, setIdentity] = useState<{ auth: boolean; email?: string; name?: string } | null>(null);
@@ -29,6 +33,7 @@ function App() {
       setRefreshedAt(new Date());
       return;
     }
+    setRefreshing(true);
     try {
       const response = await fetch("/api/state");
       if (!response.ok) throw new Error(`state request failed with status ${response.status}`);
@@ -37,6 +42,8 @@ function App() {
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -52,11 +59,22 @@ function App() {
   const openPortCount = devices.reduce((sum, device) => sum + device.open_ports.length, 0);
   const cidr = state?.run?.cidr || state?.probe?.cidr || "";
 
+  const filteredDevices = devices.filter((device) => {
+    const needle = filter.trim().toLowerCase();
+    return (statusFilter === "all" || (statusFilter === "up" ? device.alive : !device.alive)) &&
+      [device.ip, device.hostname, device.mac_address, device.vendor, device.device_type, ...device.open_ports.map((port) => `${port.port} ${port.service}`)].join(" ").toLowerCase().includes(needle);
+  });
+
   return (
-    <main className="shell">
+    <main className="shell appShell">
+      <aside className="appSidebar"><div className="brand">NetViz<span>Network inventory</span></div>
+        <nav className="workspaceNav" aria-label="Workspaces"><button className={view !== "probe" ? "active" : ""} aria-current={view !== "probe" ? "page" : undefined} onClick={() => setView("devices")}>Network<span>Inspect the latest inventory</span></button><button className={view === "probe" ? "active" : ""} aria-current={view === "probe" ? "page" : undefined} onClick={() => setView("probe")}>Probe<span>Reporting and connection</span></button></nav>
+        <div className="sidebarFoot"><span>{state ? `Server ${state.version}` : "Connecting to server"}</span><span>Inventory refreshes every 10 seconds</span></div>
+      </aside>
+      <div className="workspaceContent">
       <header className="topBar">
         <div>
-          <h1>NetViz Server</h1>
+          <p className="eyebrow">Server workspace{cidr ? ` · ${cidr}` : ""}</p><h1>{view === "probe" ? "Continuous reporting" : "Your network"}</h1>
           <p className="quiet">
             {state ? `netviz-server ${state.version}` : "connecting"}
             {refreshedAt ? ` · refreshed ${refreshedAt.toLocaleTimeString()}` : ""}
@@ -69,7 +87,7 @@ function App() {
               {identity.name || identity.email || "signed in"} · <a href="/auth/logout">sign out</a>
             </span>
           )}
-          <button onClick={() => void refresh()}>Refresh</button>
+          <button disabled={refreshing} onClick={() => void refresh()}>{refreshing ? "Refreshing…" : "Refresh"}</button>
         </div>
       </header>
 
@@ -78,7 +96,7 @@ function App() {
           Demo data — remove <code>?demo</code> from the URL to see live state.
         </div>
       )}
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error" role="alert">Could not refresh inventory. {state ? "Showing the last received data. " : ""}{error}</div>}
 
       <section className="tiles" aria-label="Network summary">
         <StatTile label="Devices" value={devices.length} />
@@ -91,11 +109,13 @@ function App() {
         />
       </section>
 
-      {devices.length > 0 && <NetworkMap devices={devices} cidr={cidr} />}
-
-      <section className="tableWrap" aria-label="Latest device inventory">
-        {devices.length > 0 ? <DeviceTable devices={devices} /> : <EmptyState connected={Boolean(state)} />}
-      </section>
+      {view === "probe" ? <section className="probeOverview"><h2>Probe connection</h2><ProbeBadge probe={state?.probe} /><p className="quiet">{state?.probe ? `Last heartbeat: ${formatTime(state.probe.last_seen)}. A heartbeat confirms the probe is reporting; device observations come from its scan cycles.` : "Waiting for the first heartbeat. Connect a probe to begin receiving observations."}</p><EmptyState connected={Boolean(state)} setup /></section> : <>
+        <div className="networkTools"><nav className="tabs" aria-label="Network views"><button aria-pressed={view === "devices"} className={view === "devices" ? "active" : ""} onClick={() => setView("devices")}>Devices</button><button aria-pressed={view === "map"} className={view === "map" ? "active" : ""} onClick={() => setView("map")}>Map</button></nav>
+        <label className="searchField"><span>Find a device</span><input type="search" placeholder="IP, name, vendor, or port" value={filter} onChange={(event) => setFilter(event.target.value)} /></label>
+        <label className="searchField"><span>Status</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All devices</option><option value="up">Up</option><option value="down">Down</option></select></label></div>
+        {devices.length > 0 ? <><p className="quiet">{filteredDevices.length} of {devices.length} devices · latest received observations{refreshedAt ? ` · checked ${refreshedAt.toLocaleTimeString()}` : ""}</p>{filteredDevices.length === 0 ? <section className="emptyState"><h2>No matching devices</h2><button onClick={() => { setFilter(""); setStatusFilter("all"); }}>Clear filters</button></section> : view === "map" ? <NetworkMap devices={filteredDevices} cidr={cidr} /> : <section className="tableWrap" aria-label="Latest device inventory"><DeviceTable devices={filteredDevices} /></section>}</> : <section className="tableWrap"><EmptyState connected={Boolean(state)} /></section>}
+      </>}
+      </div>
     </main>
   );
 }
@@ -153,7 +173,7 @@ function compareDevices(a: Device, b: Device, key: SortKey) {
 }
 
 function DeviceTable({ devices }: { devices: Device[] }) {
-  const [filter, setFilter] = useState("");
+  const filter = "";
   const [sortKey, setSortKey] = useState<SortKey>("ip");
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -192,21 +212,6 @@ function DeviceTable({ devices }: { devices: Device[] }) {
 
   return (
     <>
-      <div className="tableTools">
-        <input
-          className="tableFilter"
-          type="search"
-          placeholder="Filter by IP, hostname, MAC, vendor, port…"
-          aria-label="Filter devices"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
-        />
-        {filter.trim() && (
-          <span className="quiet">
-            {visible.length} of {devices.length} match
-          </span>
-        )}
-      </div>
       <table>
         <thead>
           <tr>
@@ -274,10 +279,10 @@ function ProbeBadge({ probe }: { probe?: ProbeStatus }) {
   );
 }
 
-function EmptyState({ connected }: { connected: boolean }) {
+function EmptyState({ connected, setup = false }: { connected: boolean; setup?: boolean }) {
   return (
     <div className="emptyState">
-      <h2>{connected ? "No device pushes yet" : "Connecting to server"}</h2>
+      <h2>{setup ? "Connect a probe" : connected ? "No device pushes yet" : "Connecting to server"}</h2>
       <p>
         Point a probe at this server and it will appear here after its first
         scan cycle:

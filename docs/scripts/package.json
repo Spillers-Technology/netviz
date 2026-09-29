@@ -1,0 +1,7 @@
+{
+  "name": "netviz-ui-validation",
+  "private": true,
+  "type": "module",
+  "scripts": { "capture": "node capture-workspaces.mjs" },
+  "devDependencies": { "playwright": "1.63.0" }
+}

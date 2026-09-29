@@ -19,7 +19,7 @@ jobs:
         run: go test ./...
       - name: Go vet
         run: go vet ./...
-      - name: Build web placeholder
+      - name: Build server web app
         run: |
           npm ci --prefix web
           npm run --prefix web build
@@ -27,3 +27,14 @@ jobs:
         run: |
           npm ci --prefix desktop/frontend
           npm run --prefix desktop/frontend build
+      - name: Validate workspace layouts and navigation
+        run: |
+          npm ci --prefix docs/scripts
+          cd docs/scripts
+          npx playwright install --with-deps chromium
+          npm run capture
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: workspace-captures
+          path: docs/assets/workspaces
