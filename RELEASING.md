@@ -167,8 +167,8 @@ Functional spot checks:
 - Server: `?demo` map renders; probe push creates then updates without
   duplicates; bad key gets 401; no key gets 503
 - Probe: `-once` push against a live AnchorDesk or netviz-server
-- Updater: Update tab detects the previous release, downloads, verifies the
-  checksum, and Install and Restart swaps the binary (keep the `.old` backup)
+- Updater: Settings › Updates detects the previous release, downloads, verifies the
+  checksum, and Install and restart swaps the binary (keep the `.old` backup)
 
 Publishing:
 
@@ -199,5 +199,5 @@ Publishing:
 - Confirm [CHANGELOG.md](CHANGELOG.md) has the v0.1.0 notes
 - Confirm [PROBE_DEPLOYMENT.md](PROBE_DEPLOYMENT.md) matches the shipped
   service commands
-- Confirm the desktop Update tab detects the release, selects the current
+- Confirm the desktop app's Settings › Updates detects the release, selects the current
   platform asset, downloads it, and verifies the `.sha256` checksum

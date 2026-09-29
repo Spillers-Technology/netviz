@@ -23,10 +23,14 @@ jobs:
         run: |
           npm ci --prefix web
           npm run --prefix web build
+      - name: Committed server web build matches its source
+        run: git diff --exit-code --stat -- internal/server/webdist
       - name: Build desktop frontend
         run: |
           npm ci --prefix desktop/frontend
           npm run --prefix desktop/frontend build
+      - name: Frontend unit tests (shared ui kit and desktop)
+        run: npm test --prefix desktop/frontend
       - name: Validate workspace layouts and navigation
         run: |
           npm ci --prefix docs/scripts

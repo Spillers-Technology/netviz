@@ -6,6 +6,46 @@ kept in the repo root as a historical record; that practice was retired
 starting with v0.3.0 in favor of this file. See [RELEASING.md](RELEASING.md)
 for the release process.
 
+## Unreleased
+
+**A redesigned desktop app and server UI.** Both frontends now share one design
+system and component kit (`ui/`), built on MUI with light and dark themes that
+follow the system (or a choice in Settings). No wire contract, CLI flag, file
+format or SQLite schema changes.
+
+- **Workspaces instead of tabs.** The desktop sidebar has Network, History,
+  Probe and Settings. Network holds three views of one scan — Devices, Groups
+  and Topology — that share one search and one selected device.
+- **A 3D topology map** (three.js) replaces the hierarchy view and the server's
+  canvas map: the gateway at the center, each device type as its own cluster,
+  device height showing open ports, change halos from monitor mode, orbit/zoom,
+  double-click to fly to a device, keyboard navigation with screen-reader
+  announcements, and a flat 2D map when WebGL isn't available or preferred. The
+  3D code loads only when the map is opened.
+- **One primary action per screen.** The scan button names the range it will
+  scan and becomes Cancel while running; occasional actions (open, save, export,
+  scan ports, show silent addresses) moved under More. Status shows once.
+- **The range starts on your network.** The desktop app detects the private
+  networks this PC is on (`DetectNetworks`) and pre-fills the first one.
+- **The probe keeps its own range.** Setting up a probe no longer overwrites
+  the scan range on the Network page. Setup checks list what's missing, each
+  with its fix, and install/uninstall/update go through a confirmation that
+  lists exactly what will change.
+- **Clearer states.** Loading, empty and error states everywhere; errors lead
+  with a plain sentence and keep the original text under Details; device
+  history failures are shown instead of swallowed; one failure no longer clears
+  another area's error.
+- **Device details** are one panel for every view, with "Copy details" for
+  pasting into a ticket.
+- **Window** opens at 1280×800 (minimum 960×640), with a title bar and startup
+  background that match the system theme.
+- **UI validation in CI** (company standard STD-008): every view is captured in
+  light and dark, at laptop and minimum window sizes (plus phone width for the
+  server UI), failing on horizontal overflow, browser errors, or a blank 3D map;
+  the 2D fallback and a synthetic `/22` are checked too. Unit tests cover the
+  shared kit, and CI fails if the committed server build doesn't match its
+  source.
+
 ## v1.0.0 — 2026-09-20
 
 The first signed release: v0.9.5 plus trust. The feature set is the frozen

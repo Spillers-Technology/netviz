@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="NetViz is a free, open-source LAN scanner and network visualizer for Windows and Linux. Scan a CIDR, watch devices stream in live, and explore them as a table, grouped graph, and hierarchy map — plus an always-on probe, a self-hosted server with an interactive network map, and OIDC SSO."
+      content="NetViz is a free, open-source LAN scanner and network visualizer for Windows and Linux. Scan a CIDR, watch devices stream in live, and explore them as a device list, groups by type, and a 3D map — plus an always-on probe, a self-hosted server with an interactive network map, and OIDC SSO."
     />
     <meta property="og:title" content="NetViz | Free LAN Scanner &amp; Network Visualizer" />
     <meta
@@ -116,8 +116,8 @@
           <p>
             A free, open-source LAN scanner and network visualizer. Enter a
             CIDR, hit scan, and watch every device on your network stream in
-            live — as a precise table, a grouped graph, and a clickable
-            hierarchy map. Windows and Linux.
+            live — as a precise device list, groups by type, and a 3D map
+            of your network. Windows and Linux.
           </p>
           <div class="heroActions">
             <a class="button primary" href="#download">Download for free</a>
@@ -217,7 +217,7 @@
             <p>
               Completed scans land in a local SQLite database — monitor cycles
               with no changes are merged, so history records state changes,
-              not noise. The History tab diffs the latest runs.
+              not noise. History compares any two scans.
             </p>
           </article>
           <article class="feature">
@@ -234,83 +234,84 @@
       <section id="views" class="band views">
         <h2>Four ways to read your network</h2>
         <p class="vlede">
-          The same monitored <code>/24</code> across every view — a precise
-          table, the grouped graph, the hierarchy map, and the history diff.
-          Click any snapshot for the full-size view.
+          The same monitored <code>/24</code> in every view — a precise device
+          list, groups by type, a 3D map, and the history diff. Light and dark
+          themes follow your system. Click any snapshot for the full-size view.
         </p>
         <div class="shots">
           <button class="shot lightbox-trigger" type="button" data-lightbox>
             <img
-              src="assets/view-table.png"
-              alt="NetViz table view listing hosts with IP, hostname, MAC, vendor, monitor state, open ports, and device type"
+              src="assets/view-devices.png"
+              alt="NetViz Devices view: a table of devices with IP address, name and vendor, what changed, type and open ports, with one device's details open on the right"
               loading="lazy"
               width="2160"
               height="1440"
             />
-            <span>Table — every host, every column, with live monitor state</span>
+            <span>Devices — every device, what changed, and its details on click</span>
           </button>
           <button class="shot lightbox-trigger" type="button" data-lightbox>
             <img
-              src="assets/view-graph.png"
-              alt="NetViz graph view grouping devices by category with open-port badges and a device detail panel"
+              src="assets/view-topology-dark.png"
+              alt="NetViz Topology view in the dark theme: a 3D map with the gateway at the center and devices clustered by type around it, taller where more ports are open"
               loading="lazy"
               width="2160"
               height="1440"
             />
-            <span>Graph — devices grouped by category</span>
+            <span>Topology — a 3D map of the network, in the dark theme</span>
           </button>
           <button class="shot lightbox-trigger" type="button" data-lightbox>
             <img
-              src="assets/view-hierarchy.png"
-              alt="NetViz hierarchy view with a central firewall node, clickable device circles, and a detail panel"
+              src="assets/view-groups.png"
+              alt="NetViz Groups view: one card per device type listing its devices with address and open-port count"
               loading="lazy"
               width="2160"
               height="1440"
             />
-            <span>Hierarchy — a /24 at a glance</span>
+            <span>Groups — devices sorted by type</span>
           </button>
           <button class="shot lightbox-trigger" type="button" data-lightbox>
             <img
               src="assets/view-history.png"
-              alt="NetViz history view listing past scan runs and diffing the two most recent scans into new, missing, and changed devices"
+              alt="NetViz History view: saved scans in a table, and a comparison of two scans showing which devices joined, left or changed"
               loading="lazy"
               width="2160"
               height="1440"
             />
-            <span>History — saved runs and the latest diff</span>
+            <span>History — saved scans and what changed between them</span>
           </button>
         </div>
         <div class="viewGrid">
           <article class="view">
-            <h3>Table</h3>
+            <h3>Devices</h3>
             <p>
-              The precise operational view: IP, hostname, MAC, vendor, alive
-              status, open ports, device type, first seen, and last updated.
-              Dead addresses are hidden by default — flip
-              <code>Show checked-only</code> to see every probe.
+              The precise operational view: address, name and vendor, what
+              changed in the latest pass, type, open ports, MAC, first and last
+              seen. Columns fit the window instead of scrolling sideways, and
+              addresses that never answered stay out of the way until you ask.
             </p>
           </article>
           <article class="view">
-            <h3>Graph</h3>
+            <h3>Groups</h3>
             <p>
-              Devices grouped by inferred category — routers, printers,
-              Windows/SMB, SSH hosts, web appliances — with open-port badges
-              on every node.
+              One card per device type that is actually present — network gear,
+              Windows, Linux and IoT, printers, cameras, web appliances — with
+              changes called out on each device.
             </p>
           </article>
           <article class="view">
-            <h3>Hierarchy</h3>
+            <h3>Topology</h3>
             <p>
-              A firewall/root node at the center with compact, clickable device
-              circles around it. Built to stay readable on dense
-              <code>/24</code> scans.
+              The gateway at the center and every device type as its own
+              cluster around it. Taller devices have more open ports. Orbit,
+              zoom, double-click to fly to a device, or switch to the flat map.
+              Smooth well past a <code>/24</code>.
             </p>
           </article>
           <article class="view">
             <h3>History</h3>
             <p>
-              Every saved run at a glance, plus a diff of the two most recent
-              scans: which devices appeared, and which went missing.
+              Every saved scan at a glance. Compare any two to see which
+              devices joined, which left, and exactly what changed on the rest.
             </p>
           </article>
         </div>
@@ -368,7 +369,7 @@
           <article class="feature">
             <h3>Provision from the GUI</h3>
             <p>
-              The desktop Probe tab installs, configures, and manages the
+              The desktop app's Probe page installs, configures, and manages the
               service — URL, key, CIDR, interval — through a shared config
               file the running service re-reads on every cycle.
             </p>
@@ -377,9 +378,9 @@
             <h3>Self-hosted server</h3>
             <p>
               One Docker container stores every push in SQLite and serves a
-              live dashboard: stat tiles, a full device table, and an
-              interactive canvas network map with zoom, pan, tooltips, and a
-              clickable legend. Try the map with <code>/?demo</code>.
+              live dashboard: the full device list, device details on click,
+              and the same 3D network map as the desktop app — in light or
+              dark, on a laptop or a phone. Try it with <code>/?demo</code>.
             </p>
           </article>
           <article class="feature">
@@ -395,12 +396,12 @@
           <button class="shot lightbox-trigger" type="button" data-lightbox>
             <img
               src="assets/view-probe.png"
-              alt="NetViz desktop Probe tab: configure the CIDR, AnchorDesk URL, key, and interval, then install, start, stop, or uninstall the persistent probe service"
+              alt="NetViz desktop Probe page: the network range, server address, key and report interval, and the running service with restart, stop and uninstall"
               loading="lazy"
               width="2160"
               height="1440"
             />
-            <span>Probe tab — provision and control the headless service from the desktop app</span>
+            <span>Probe — set up and control the always-on service from the desktop app</span>
           </button>
         </div>
         <pre><code>docker run -p 8080:8080 -e NETVIZ_INGEST_KEY=your-key \
