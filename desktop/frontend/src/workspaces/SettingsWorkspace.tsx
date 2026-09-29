@@ -166,6 +166,15 @@ export function SettingsWorkspace({ scan, updates, portsRef }: { scan: ScanState
                 <Button onClick={() => void updates.openDownload()} disabled={updates.busy}>
                   Show download
                 </Button>
+                {/* If the saved archive went missing or won't install, these recover without a restart. */}
+                {info.available && (
+                  <Button onClick={() => void updates.download()} disabled={updates.busy}>
+                    Download again
+                  </Button>
+                )}
+                <Button onClick={() => void updates.check()} disabled={updates.busy}>
+                  Check for updates
+                </Button>
               </>
             ) : info.available ? (
               <Button variant="contained" onClick={() => void updates.download()} disabled={updates.busy}>

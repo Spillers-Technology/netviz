@@ -28,9 +28,12 @@ export function useProbe(defaultCidr: string) {
   const [startAfterInstall, setStartAfterInstall] = useState(true);
   const action = useAsyncAction("That probe action");
 
-  const adopt = useCallback((next: ProbeServiceStatus, fromConfig: boolean) => {
+  // After provisioning or a service action the backend reports where the
+  // probe now lives (the install location), which replaces a temporary path
+  // the user picked; a plain status read keeps the user's choice.
+  const adopt = useCallback((next: ProbeServiceStatus, fromConfig: boolean, replacePath = false) => {
     setStatus(next);
-    if (next.probe_path) setProbePath((current) => current || next.probe_path);
+    if (next.probe_path) setProbePath((current) => (replacePath ? next.probe_path : current || next.probe_path));
     if (fromConfig && next.config) {
       setCidr(next.config.cidr);
       setURL(next.config.anchordesk_url);
@@ -78,7 +81,7 @@ export function useProbe(defaultCidr: string) {
         }),
       installPersistent ? "Installing the probe" : "Sending the report",
     );
-    if (next) adopt(next, false);
+    if (next) adopt(next, false, true);
     return Boolean(next);
   }, [action, adopt, cidr, url, key, interval, probePath, installPersistent, startAfterInstall]);
 
@@ -86,7 +89,7 @@ export function useProbe(defaultCidr: string) {
     async (verb: "start" | "stop" | "restart" | "uninstall") => {
       const doing = { start: "Starting", stop: "Stopping", restart: "Restarting", uninstall: "Uninstalling" }[verb];
       const next = await action.run(() => app().ProbeServiceAction(verb, probePath), `${doing} the probe service`);
-      if (next) adopt(next, false);
+      if (next) adopt(next, false, true);
     },
     [action, adopt, probePath],
   );

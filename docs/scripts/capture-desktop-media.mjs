@@ -429,6 +429,15 @@ async function main() {
         await assertCanvasPainted(page);
         await captureView(page, errors, path.join(outDir, `desktop-${tag}-topology.png`));
 
+        // Choosing the flat map and coming back must give the 3D map again; tearing
+        // the canvas down is not a lost WebGL context.
+        await page.getByRole("button", { name: "Flat map" }).click();
+        await page.locator('[data-topology-renderer="flat"]').waitFor();
+        await page.getByRole("button", { name: "3D map" }).click();
+        await page.locator('[data-topology-ready="true"]').waitFor({ timeout: 30_000 });
+        await page.waitForTimeout(400);
+        await assertCanvasPainted(page);
+
         // Search carries across views and dims the map; leaving and coming
         // back keeps both the view and the search.
         const search = page.getByRole("searchbox", { name: "Find a device" });

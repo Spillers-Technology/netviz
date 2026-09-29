@@ -61,7 +61,10 @@ export function NetworkWorkspace({
   onOpenPorts: () => void;
 }) {
   const theme = useTheme();
-  const wide = useMediaQuery(theme.breakpoints.up("lg"));
+  // Details sit beside the content from tablet width up (narrower below 1200px)
+  // so they never cover the views' own controls; phones get a modal drawer.
+  const wide = useMediaQuery(theme.breakpoints.up("md"));
+  const roomy = useMediaQuery(theme.breakpoints.up("lg"));
   const [selectedIP, setSelectedIP] = useState("");
 
   const needle = search.trim().toLowerCase();
@@ -129,7 +132,7 @@ export function NetworkWorkspace({
               icon={RadarOutlined}
               title="Start with a network"
               action={
-                scan.cidrValid && (
+                !scan.blocked && (
                   <Button variant="contained" onClick={() => void scan.startScan(false)}>
                     Scan {scan.cidr.trim()}
                   </Button>
@@ -207,22 +210,14 @@ export function NetworkWorkspace({
             )}
           </Box>
           {wide && detail && (
-            <Paper square sx={{ width: 360, flexShrink: 0, borderTop: 0, borderBottom: 0, borderRight: 0 }}>
+            <Paper square sx={{ width: roomy ? 360 : 300, flexShrink: 0, borderTop: 0, borderBottom: 0, borderRight: 0 }}>
               {detail}
             </Paper>
           )}
         </Box>
       )}
       {!wide && (
-        // Narrow windows: the details float over the right edge without blocking
-        // the rest of the page, so views and search stay usable.
-        <Drawer
-          anchor="right"
-          variant="persistent"
-          open={Boolean(detail)}
-          onKeyDown={(event) => event.key === "Escape" && setSelectedIP("")}
-          slotProps={{ paper: { sx: { width: 340, maxWidth: "100%", boxShadow: 8, borderLeft: 1, borderColor: "divider" } } }}
-        >
+        <Drawer anchor="right" open={Boolean(detail)} onClose={() => setSelectedIP("")} slotProps={{ paper: { sx: { width: 340, maxWidth: "100%" } } }}>
           {detail}
         </Drawer>
       )}

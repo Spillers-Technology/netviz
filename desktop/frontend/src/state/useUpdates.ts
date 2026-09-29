@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { useAsyncAction } from "@netviz/ui";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { friendlyError, type FriendlyError } from "@netviz/ui";
 import { app, hasBridge, type UpdateInfo } from "../bridge";
 
 const unknown: UpdateInfo = {
@@ -16,52 +16,61 @@ const unknown: UpdateInfo = {
 };
 
 // useUpdates checks for a newer release quietly at startup; errors only show
-// once the user checks on purpose.
+// once the user checks on purpose. Every request takes a sequence number and
+// only the newest one may change state, so a slow startup check can never
+// overwrite a download the user finished in the meantime.
 export function useUpdates() {
   const [info, setInfo] = useState<UpdateInfo>(unknown);
   const [checked, setChecked] = useState(false);
-  const action = useAsyncAction("Checking for updates");
+  const [pending, setPending] = useState(0);
+  const [error, setError] = useState<FriendlyError | null>(null);
+  const latest = useRef(0);
+
+  const track = useCallback(async <T,>(task: () => Promise<T>, action: string, quiet = false): Promise<T | undefined> => {
+    const id = ++latest.current;
+    setPending((count) => count + 1);
+    if (!quiet) setError(null);
+    try {
+      const result = await task();
+      return id === latest.current ? result : undefined;
+    } catch (err) {
+      if (!quiet && id === latest.current) setError(friendlyError(err, action));
+      return undefined;
+    } finally {
+      setPending((count) => count - 1);
+    }
+  }, []);
 
   const check = useCallback(
     async (quiet = false) => {
-      if (quiet) {
-        try {
-          setInfo(await app().CheckForUpdate());
-          setChecked(true);
-        } catch {
-          // A quiet startup check stays quiet; Settings can check again.
-        }
-        return;
-      }
-      const result = await action.run(() => app().CheckForUpdate(), "Checking for updates");
+      const result = await track(() => app().CheckForUpdate(), "Checking for updates", quiet);
       if (result) {
         setInfo(result);
         setChecked(true);
       }
     },
-    [action],
+    [track],
   );
 
   useEffect(() => {
     if (hasBridge()) void check(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [check]);
 
   const download = useCallback(async () => {
-    const result = await action.run(() => app().DownloadLatestUpdate(), "Downloading the update");
+    const result = await track(() => app().DownloadLatestUpdate(), "Downloading the update");
     if (result) setInfo(result);
-  }, [action]);
+  }, [track]);
 
   const openDownload = useCallback(async () => {
-    await action.run(() => app().OpenUpdateDownload(info.download_path), "Showing the download");
-  }, [action, info.download_path]);
+    await track(() => app().OpenUpdateDownload(info.download_path), "Showing the download");
+  }, [track, info.download_path]);
 
   const apply = useCallback(async () => {
-    const message = await action.run(() => app().ApplyDownloadedUpdate(info.download_path), "Installing the update");
+    const message = await track(() => app().ApplyDownloadedUpdate(info.download_path), "Installing the update");
     if (message !== undefined) setInfo((current) => ({ ...current, message }));
-  }, [action, info.download_path]);
+  }, [track, info.download_path]);
 
-  return { info, checked, busy: action.busy, error: action.error, clearError: action.clear, check, download, openDownload, apply };
+  return { info, checked, busy: pending > 0, error, clearError: () => setError(null), check, download, openDownload, apply };
 }
 
 export type UpdatesState = ReturnType<typeof useUpdates>;

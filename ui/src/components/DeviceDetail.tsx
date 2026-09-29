@@ -141,10 +141,10 @@ export function DeviceDetail({
                 <Stack spacing={0.75}>
                   {history.entries.map((entry) => (
                     <Stack key={entry.run_id} direction="row" spacing={1.5}>
-                      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 118, whiteSpace: "nowrap" }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 104, flexShrink: 0, whiteSpace: "nowrap" }}>
                         {formatHistoryRange(entry)}
                       </Typography>
-                      <Typography variant="body2" sx={{ fontFamily: monoFont, fontSize: 12.5 }}>
+                      <Typography variant="body2" sx={{ fontFamily: monoFont, fontSize: 12.5, minWidth: 0, overflowWrap: "anywhere" }}>
                         {summarizeObservation(entry.host)}
                       </Typography>
                     </Stack>

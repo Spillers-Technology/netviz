@@ -205,7 +205,10 @@ function NetworkPage({
   onSetUpProbe: () => void;
 }) {
   const theme = useTheme();
-  const wide = useMediaQuery(theme.breakpoints.up("lg"));
+  // Details sit beside the content from tablet width up (narrower below 1200px)
+  // so they never cover the views' own controls; phones get a modal drawer.
+  const wide = useMediaQuery(theme.breakpoints.up("md"));
+  const roomy = useMediaQuery(theme.breakpoints.up("lg"));
   const [selectedIP, setSelectedIP] = useState("");
   const devices = useMemo(() => [...(server.state?.devices ?? [])].sort((a, b) => compareIP(a.ip, b.ip)), [server.state]);
   const cidr = server.state?.run?.cidr || server.state?.probe?.cidr || "";
@@ -326,7 +329,7 @@ function NetworkPage({
               )}
             </Box>
             {wide && detail && (
-              <Paper square sx={{ width: 360, flexShrink: 0, borderTop: 0, borderBottom: 0, borderRight: 0 }}>
+              <Paper square sx={{ width: roomy ? 360 : 300, flexShrink: 0, borderTop: 0, borderBottom: 0, borderRight: 0 }}>
                 {detail}
               </Paper>
             )}
@@ -334,13 +337,7 @@ function NetworkPage({
         )
       )}
       {!wide && (
-        <Drawer
-          anchor="right"
-          variant="persistent"
-          open={Boolean(detail)}
-          onKeyDown={(event) => event.key === "Escape" && setSelectedIP("")}
-          slotProps={{ paper: { sx: { width: 340, maxWidth: "100%", boxShadow: 8, borderLeft: 1, borderColor: "divider" } } }}
-        >
+        <Drawer anchor="right" open={Boolean(detail)} onClose={() => setSelectedIP("")} slotProps={{ paper: { sx: { width: 340, maxWidth: "100%" } } }}>
           {detail}
         </Drawer>
       )}
@@ -371,6 +368,9 @@ function ProbesPage({ server, freshness, actions }: { server: Server; freshness:
         actions={actions}
       />
       <Stack spacing={2} sx={{ p: { xs: 2, sm: 3 }, overflow: "auto", maxWidth: 960 }}>
+        {server.error && (
+          <ErrorNotice error={{ ...server.error, lead: `${server.error.lead}${probe ? " The probe details below may be out of date." : ""}` }} />
+        )}
         {probe && (
           <Paper component="section" aria-labelledby="probe-heading" sx={{ p: 2 }}>
             <Typography id="probe-heading" variant="h2" sx={{ mb: 1.5 }}>

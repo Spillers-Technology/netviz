@@ -29,7 +29,7 @@ export function ScanToolbar({ scan, onOpenPorts }: { scan: ScanState; onOpenPort
   const toast = useToast();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const cidr = scan.cidr.trim();
-  const blocked = !scan.cidrValid ? "Enter a network range like 192.168.1.0/24." : !scan.portsValid ? "Choose between 1 and 64 scan ports in Settings." : "";
+  const blocked = scan.blocked;
 
   async function file(action: "open" | "save" | "csv") {
     setMenuAnchor(null);

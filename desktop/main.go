@@ -59,10 +59,10 @@ func appMenu(app *App) *menu.Menu {
 		_, _ = app.OpenScanFile()
 	})
 	file.AddText("Save Scan", keys.CmdOrCtrl("s"), func(_ *menu.CallbackData) {
-		_ = app.SaveScanFile()
+		_, _ = app.SaveScanFile()
 	})
 	file.AddText("Save CSV", keys.Combo("s", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
-		_ = app.SaveCSVFile()
+		_, _ = app.SaveCSVFile()
 	})
 	return root
 }

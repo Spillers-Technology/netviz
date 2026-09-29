@@ -140,8 +140,27 @@ export function useScan() {
   useEffect(() => void (portsRef.current = scanPorts), [scanPorts]);
 
   const cidrValid = isValidCIDR(cidr);
+  // Why a scan can't start right now, or "" when it can. Every entry point
+  // (toolbar, empty state, Enter, monitor) goes through startScan, which
+  // enforces this before touching results or calling the backend.
+  const blocked = !cidrValid
+    ? "Enter a network range like 192.168.1.0/24."
+    : !portsValid
+      ? "Choose between 1 and 64 scan ports in Settings."
+      : "";
+  const blockedRef = useRef(blocked);
+  blockedRef.current = blocked;
 
   const startScan = useCallback(async (preserve = false, fromMonitor = false) => {
+    if (blockedRef.current) {
+      // A monitor loop that can no longer scan stops, and says why.
+      if (fromMonitor) {
+        setMonitoring(false);
+        monitoringRef.current = false;
+      }
+      setError({ lead: blockedRef.current, details: "" });
+      return;
+    }
     setError(null);
     if (!preserve) {
       hostsRef.current = {};
@@ -194,9 +213,9 @@ export function useScan() {
         if (opened) loadHosts(opened);
         return Boolean(opened);
       }
-      if (action === "save") await app().SaveScanFile();
-      else await app().SaveCSVFile();
-      return true;
+      const saved = action === "save" ? await app().SaveScanFile() : await app().SaveCSVFile();
+      // Older bridges resolved nothing; only an explicit false means cancelled.
+      return saved !== false;
     } catch (err) {
       setError(friendlyError(err, action === "open" ? "Opening the scan file" : action === "save" ? "Saving the scan" : "Exporting the CSV"));
       return false;
@@ -207,6 +226,7 @@ export function useScan() {
     cidr,
     setCidr,
     cidrValid,
+    blocked,
     detected,
     hosts,
     rows,

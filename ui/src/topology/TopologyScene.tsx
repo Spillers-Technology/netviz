@@ -65,6 +65,16 @@ export default function TopologyScene(props: TopologySceneProps) {
   const colors = palette(mode);
   const bloom = mode === "dark";
   const distance = layout.extent * 2.1;
+  // R3F forces a context loss when the canvas unmounts (for example when the
+  // user picks the flat map). That is not a failure, so the listener only
+  // reports losses while this scene is still mounted.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   return (
     <Canvas
@@ -77,7 +87,7 @@ export default function TopologyScene(props: TopologySceneProps) {
       onCreated={(state) => {
         state.gl.domElement.addEventListener("webglcontextlost", (event) => {
           event.preventDefault();
-          onContextLost();
+          if (alive.current) onContextLost();
         });
         onReady({
           bench: (frames) => {
@@ -118,6 +128,13 @@ function Floor({ layout, colors, mode }: { layout: TopologyLayout; colors: Palet
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     return new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: colors.ring, transparent: true, opacity: 0.7 }));
   }, [layout.ringRadius, colors.ring]);
+  useEffect(
+    () => () => {
+      ringLine.geometry.dispose();
+      (ringLine.material as THREE.Material).dispose();
+    },
+    [ringLine],
+  );
 
   return (
     <group>
@@ -192,6 +209,13 @@ function Network({
     geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(capacity * 6), 3));
     return geometry;
   }, [capacity]);
+
+  useEffect(() => () => edgeGeometry.dispose(), [edgeGeometry]);
+  useEffect(() => () => pillarGeometry.dispose(), [pillarGeometry]);
+  useEffect(() => () => {
+    nodeGeometry.dispose();
+    haloGeometry.dispose();
+  }, [nodeGeometry, haloGeometry]);
 
   // Per-node colors, recomputed only when what they depend on changes.
   const nodeColors = useMemo(() => {
@@ -317,6 +341,8 @@ function Network({
     halos.count = halo;
     halos.instanceMatrix.needsUpdate = true;
     if (halos.instanceColor) halos.instanceColor.needsUpdate = true;
+    // Stale bounds would cull halos added after the first frame.
+    halos.computeBoundingSphere();
     edges.geometry.setDrawRange(0, edge * 2);
     edgePositions.needsUpdate = true;
     edgeColors.needsUpdate = true;
@@ -495,7 +521,9 @@ function CameraRig({
       dampingFactor={0.12}
       maxPolarAngle={1.32}
       minDistance={2.5}
-      maxDistance={layout.extent * 5 + 10}
+      // Always reachable from the home view, or the camera rig would chase a
+      // clamped position forever and never stop rendering.
+      maxDistance={Math.max(layout.extent * 5 + 10, home.position.distanceTo(home.target) * 1.5)}
       onStart={() => {
         userMoved.current = true;
         goal.current = null;

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import LinearProgress from "@mui/material/LinearProgress";
@@ -19,6 +19,25 @@ import type { SceneApi } from "./TopologyScene";
 
 const TopologyScene = lazy(() => import("./TopologyScene"));
 
+// SceneBoundary turns any failure to start or draw the 3D scene (renderer
+// creation, a missing extension, a failed chunk load) into the flat map
+// rather than an error page.
+class SceneBoundary extends Component<{ onFail: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch() {
+    this.props.onFail();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 declare global {
   interface Window {
     __netvizForceFlat?: boolean;
@@ -34,14 +53,24 @@ function readPreference(): "3d" | "flat" {
   }
 }
 
+// Probed once per page load: each probe creates a WebGL context, and browsers
+// cap how many can be alive at once.
+let webglProbe: boolean | undefined;
+
 export function webglAvailable() {
   if (typeof window === "undefined" || window.__netvizForceFlat) return false;
-  try {
-    const canvas = document.createElement("canvas");
-    return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
-  } catch {
-    return false;
+  if (webglProbe === undefined) {
+    try {
+      const canvas = document.createElement("canvas");
+      // three.js r163+ renders with WebGL2 only; WebGL1-only systems get the flat map.
+      const context = canvas.getContext("webgl2");
+      webglProbe = Boolean(context);
+      context?.getExtension("WEBGL_lose_context")?.loseContext();
+    } catch {
+      webglProbe = false;
+    }
   }
+  return webglProbe;
 }
 
 // Topology is the "see the network" view: a 3D map by default, the same
@@ -151,6 +180,7 @@ export function Topology({
         sx={{ position: "absolute", inset: 0, outline: "none", "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: "-2px" } }}
       >
         {renderer === "3d" ? (
+          <SceneBoundary onFail={() => setContextLost(true)}>
           <Suspense fallback={<LinearProgress aria-label="Loading the 3D map" sx={{ position: "absolute", top: 0, left: 0, right: 0 }} />}>
             <TopologyScene
               layout={layout}
@@ -177,6 +207,7 @@ export function Topology({
               labelLayer={labelLayer as RefObject<HTMLElement>}
             />
           </Suspense>
+          </SceneBoundary>
         ) : (
           <FlatTopology layout={layout} states={states} selectedIP={selectedIP} matches={matches} onSelect={onSelect} />
         )}

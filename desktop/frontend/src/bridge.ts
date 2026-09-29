@@ -81,9 +81,10 @@ type AppBindings = {
   CancelScan(): Promise<void>;
   DefaultPorts(): Promise<PortObservation[]>;
   DetectNetworks?(): Promise<string[]>;
-  SaveScanFile(): Promise<void>;
+  // Save methods resolve false when the user cancels the dialog.
+  SaveScanFile(): Promise<boolean>;
   OpenScanFile(): Promise<HostObservation[] | null>;
-  SaveCSVFile(): Promise<void>;
+  SaveCSVFile(): Promise<boolean>;
   ListHistory(): Promise<ScanRun[]>;
   LatestDiff(): Promise<ScanDiff>;
   DiffRuns(baseRunID: string, compareRunID: string): Promise<ScanDiff>;
