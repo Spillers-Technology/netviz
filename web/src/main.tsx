@@ -1,317 +1,432 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import "./styles.css";
-import type { Device, ProbeStatus, ServerState } from "./types";
-import NetworkMap from "./NetworkMap";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Drawer from "@mui/material/Drawer";
+import IconButton from "@mui/material/IconButton";
+import InputAdornment from "@mui/material/InputAdornment";
+import LinearProgress from "@mui/material/LinearProgress";
+import Link from "@mui/material/Link";
+import MenuItem from "@mui/material/MenuItem";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
+import HubOutlined from "@mui/icons-material/HubOutlined";
+import SensorsOutlined from "@mui/icons-material/SensorsOutlined";
+import RefreshOutlined from "@mui/icons-material/RefreshOutlined";
+import SearchOutlined from "@mui/icons-material/SearchOutlined";
+import CloseOutlined from "@mui/icons-material/CloseOutlined";
+import TableRowsOutlined from "@mui/icons-material/TableRowsOutlined";
+import ContentCopyOutlined from "@mui/icons-material/ContentCopyOutlined";
+import SearchOffOutlined from "@mui/icons-material/SearchOffOutlined";
+import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
+import {
+  AppShell,
+  DeviceDetail,
+  DeviceTable,
+  EmptyState,
+  ErrorNotice,
+  NetvizRoot,
+  PageHeader,
+  SERVER_COLUMNS,
+  StatusChip,
+  Topology,
+  WorkspaceBoundary,
+  compareIP,
+  formatAge,
+  friendlyError,
+  hostMatchesFilter,
+  monoFont,
+  normalizeHost,
+  useToast,
+  type FriendlyError,
+  type NavItem,
+} from "@netviz/ui";
+import type { Identity, ProbeStatus, ServerState } from "./types";
 import { demoState } from "./demo";
 
-const REFRESH_MS = 10000;
+const REFRESH_MS = 10_000;
 const PROBE_STALE_MS = 5 * 60 * 1000;
 
-function App() {
-  const demo = useMemo(() => new URLSearchParams(window.location.search).has("demo"), []);
+type Load = { status: "loading" } | { status: "ready" };
+
+function useServerState(demo: boolean) {
   const [state, setState] = useState<ServerState | null>(null);
-  const [view, setView] = useState<"devices" | "map" | "probe">("devices");
-  const [filter, setFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [load, setLoad] = useState<Load>({ status: "loading" });
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<FriendlyError | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
-  const [identity, setIdentity] = useState<{ auth: boolean; email?: string; name?: string } | null>(null);
 
-  useEffect(() => {
-    if (demo) return;
-    fetch("/api/me")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((me) => setIdentity(me))
-      .catch(() => {});
-  }, [demo]);
-
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (demo) {
       setState(demoState());
       setRefreshedAt(new Date());
+      setLoad({ status: "ready" });
       return;
     }
     setRefreshing(true);
     try {
       const response = await fetch("/api/state");
       if (!response.ok) throw new Error(`state request failed with status ${response.status}`);
-      setState((await response.json()) as ServerState);
+      const next = (await response.json()) as ServerState;
+      setState({ ...next, devices: (next.devices || []).map(normalizeHost) });
       setRefreshedAt(new Date());
-      setError("");
+      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(friendlyError(err, "Refreshing the inventory"));
     } finally {
       setRefreshing(false);
+      setLoad({ status: "ready" });
     }
-  }
+  }, [demo]);
 
   useEffect(() => {
     void refresh();
     const timer = window.setInterval(() => void refresh(), REFRESH_MS);
     return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refresh]);
 
-  const devices = state?.devices ?? [];
-  const upCount = devices.filter((device) => device.alive).length;
-  const openPortCount = devices.reduce((sum, device) => sum + device.open_ports.length, 0);
-  const cidr = state?.run?.cidr || state?.probe?.cidr || "";
+  return { state, load, refreshing, error, refreshedAt, refresh };
+}
 
-  const filteredDevices = devices.filter((device) => {
-    const needle = filter.trim().toLowerCase();
-    return (statusFilter === "all" || (statusFilter === "up" ? device.alive : !device.alive)) &&
-      [device.ip, device.hostname, device.mac_address, device.vendor, device.device_type, ...device.open_ports.map((port) => `${port.port} ${port.service}`)].join(" ").toLowerCase().includes(needle);
-  });
+function probeFreshness(probe?: ProbeStatus) {
+  if (!probe) return { tone: "neutral" as const, label: "Waiting for a probe" };
+  const age = Date.now() - new Date(probe.last_seen).getTime();
+  return age > PROBE_STALE_MS
+    ? { tone: "warning" as const, label: `Probe quiet · last seen ${formatAge(age)} ago` }
+    : { tone: "success" as const, label: `Probe reporting · seen ${formatAge(age)} ago` };
+}
+
+function App() {
+  const demo = useMemo(() => new URLSearchParams(window.location.search).has("demo"), []);
+  const server = useServerState(demo);
+  const [identity, setIdentity] = useState<Identity | null>(null);
+  const [workspace, setWorkspace] = useState<"network" | "probes">("network");
+  const [view, setView] = useState<"devices" | "map">("devices");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  useEffect(() => {
+    if (demo) return;
+    fetch("/api/me")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((me) => setIdentity(me))
+      .catch(() => {
+        // Identity is optional: servers without SSO have no /api/me user.
+      });
+  }, [demo]);
+
+  const nav: NavItem[] = [
+    { id: "network", label: "Network", description: "Latest reported devices", icon: HubOutlined },
+    { id: "probes", label: "Probes", description: "Reporting and setup", icon: SensorsOutlined, badge: !server.state?.probe && server.load.status === "ready", badgeLabel: "No probe connected" },
+  ];
+
+  const freshness = probeFreshness(server.state?.probe);
+  const actions = (
+    <>
+      {demo && <StatusChip tone="info" label="Demo data" title="Sample devices. Remove ?demo from the address to see live data." />}
+      {identity?.auth && (
+        <Button href="/auth/logout" startIcon={<LogoutOutlined />} title={identity.email || undefined}>
+          Sign out {identity.name || identity.email || ""}
+        </Button>
+      )}
+      <Button variant="outlined" startIcon={<RefreshOutlined />} onClick={() => void server.refresh()} disabled={server.refreshing}>
+        {server.refreshing ? "Refreshing…" : "Refresh"}
+      </Button>
+    </>
+  );
 
   return (
-    <main className="shell appShell">
-      <aside className="appSidebar"><div className="brand">NetViz<span>Network inventory</span></div>
-        <nav className="workspaceNav" aria-label="Workspaces"><button className={view !== "probe" ? "active" : ""} aria-current={view !== "probe" ? "page" : undefined} onClick={() => setView("devices")}>Network<span>Inspect the latest inventory</span></button><button className={view === "probe" ? "active" : ""} aria-current={view === "probe" ? "page" : undefined} onClick={() => setView("probe")}>Probe<span>Reporting and connection</span></button></nav>
-        <div className="sidebarFoot"><span>{state ? `Server ${state.version}` : "Connecting to server"}</span><span>Inventory refreshes every 10 seconds</span></div>
-      </aside>
-      <div className="workspaceContent">
-      <header className="topBar">
-        <div>
-          <p className="eyebrow">Server workspace{cidr ? ` · ${cidr}` : ""}</p><h1>{view === "probe" ? "Continuous reporting" : "Your network"}</h1>
-          <p className="quiet">
-            {state ? `netviz-server ${state.version}` : "connecting"}
-            {refreshedAt ? ` · refreshed ${refreshedAt.toLocaleTimeString()}` : ""}
-          </p>
-        </div>
-        <div className="topActions">
-          <ProbeBadge probe={state?.probe} />
-          {identity?.auth && (
-            <span className="identity">
-              {identity.name || identity.email || "signed in"} · <a href="/auth/logout">sign out</a>
-            </span>
-          )}
-          <button disabled={refreshing} onClick={() => void refresh()}>{refreshing ? "Refreshing…" : "Refresh"}</button>
-        </div>
-      </header>
-
-      {demo && (
-        <div className="demoBanner">
-          Demo data — remove <code>?demo</code> from the URL to see live state.
-        </div>
-      )}
-      {error && <div className="error" role="alert">Could not refresh inventory. {state ? "Showing the last received data. " : ""}{error}</div>}
-
-      <section className="tiles" aria-label="Network summary">
-        <StatTile label="Devices" value={devices.length} />
-        <StatTile label="Up" value={upCount} />
-        <StatTile label="Open ports" value={openPortCount} />
-        <StatTile
-          label="Last push"
-          value={state?.run ? new Date(state.run.ended_at || state.run.started_at).toLocaleTimeString() : "—"}
-          detail={state?.run ? state.run.cidr : "no runs stored"}
-        />
-      </section>
-
-      {view === "probe" ? <section className="probeOverview"><h2>Probe connection</h2><ProbeBadge probe={state?.probe} /><p className="quiet">{state?.probe ? `Last heartbeat: ${formatTime(state.probe.last_seen)}. A heartbeat confirms the probe is reporting; device observations come from its scan cycles.` : "Waiting for the first heartbeat. Connect a probe to begin receiving observations."}</p><EmptyState connected={Boolean(state)} setup /></section> : <>
-        <div className="networkTools"><nav className="tabs" aria-label="Network views"><button aria-pressed={view === "devices"} className={view === "devices" ? "active" : ""} onClick={() => setView("devices")}>Devices</button><button aria-pressed={view === "map"} className={view === "map" ? "active" : ""} onClick={() => setView("map")}>Map</button></nav>
-        <label className="searchField"><span>Find a device</span><input type="search" placeholder="IP, name, vendor, or port" value={filter} onChange={(event) => setFilter(event.target.value)} /></label>
-        <label className="searchField"><span>Status</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All devices</option><option value="up">Up</option><option value="down">Down</option></select></label></div>
-        {devices.length > 0 ? <><p className="quiet">{filteredDevices.length} of {devices.length} devices · latest received observations{refreshedAt ? ` · checked ${refreshedAt.toLocaleTimeString()}` : ""}</p>{filteredDevices.length === 0 ? <section className="emptyState"><h2>No matching devices</h2><button onClick={() => { setFilter(""); setStatusFilter("all"); }}>Clear filters</button></section> : view === "map" ? <NetworkMap devices={filteredDevices} cidr={cidr} /> : <section className="tableWrap" aria-label="Latest device inventory"><DeviceTable devices={filteredDevices} /></section>}</> : <section className="tableWrap"><EmptyState connected={Boolean(state)} /></section>}
-      </>}
-      </div>
-    </main>
+    <AppShell
+      product="NetViz"
+      tagline="Network inventory"
+      nav={nav}
+      active={workspace}
+      onNavigate={(id) => setWorkspace(id as "network" | "probes")}
+      footer={
+        <Typography variant="caption" color="text.secondary">
+          {server.state ? `Server ${server.state.version}` : "Connecting to the server"}
+          <br />
+          Refreshes every {REFRESH_MS / 1000} seconds
+        </Typography>
+      }
+    >
+      <WorkspaceBoundary name={workspace === "network" ? "Network" : "Probes"}>
+        {workspace === "network" ? (
+          <NetworkPage
+            server={server}
+            freshness={freshness}
+            actions={actions}
+            view={view}
+            onViewChange={setView}
+            search={search}
+            onSearchChange={setSearch}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            onSetUpProbe={() => setWorkspace("probes")}
+          />
+        ) : (
+          <ProbesPage server={server} freshness={freshness} actions={actions} />
+        )}
+      </WorkspaceBoundary>
+    </AppShell>
   );
 }
 
-type SortKey = "ip" | "hostname" | "mac" | "vendor" | "status" | "ports" | "type" | "last_seen";
+type Server = ReturnType<typeof useServerState>;
+type Freshness = ReturnType<typeof probeFreshness>;
 
-const DEVICE_COLUMNS: { key: SortKey; label: string }[] = [
-  { key: "ip", label: "IP" },
-  { key: "hostname", label: "Hostname" },
-  { key: "mac", label: "MAC" },
-  { key: "vendor", label: "Vendor" },
-  { key: "status", label: "Status" },
-  { key: "ports", label: "Open ports" },
-  { key: "type", label: "Device type" },
-  { key: "last_seen", label: "Last seen" },
-];
+function NetworkPage({
+  server,
+  freshness,
+  actions,
+  view,
+  onViewChange,
+  search,
+  onSearchChange,
+  statusFilter,
+  onStatusFilterChange,
+  onSetUpProbe,
+}: {
+  server: Server;
+  freshness: Freshness;
+  actions: React.ReactNode;
+  view: "devices" | "map";
+  onViewChange: (view: "devices" | "map") => void;
+  search: string;
+  onSearchChange: (value: string) => void;
+  statusFilter: string;
+  onStatusFilterChange: (value: string) => void;
+  onSetUpProbe: () => void;
+}) {
+  const theme = useTheme();
+  const wide = useMediaQuery(theme.breakpoints.up("lg"));
+  const [selectedIP, setSelectedIP] = useState("");
+  const devices = useMemo(() => [...(server.state?.devices ?? [])].sort((a, b) => compareIP(a.ip, b.ip)), [server.state]);
+  const cidr = server.state?.run?.cidr || server.state?.probe?.cidr || "";
+  const needle = search.trim().toLowerCase();
+  const filtered = useMemo(
+    () => devices.filter((device) => (statusFilter === "all" || (statusFilter === "up" ? device.alive : !device.alive)) && hostMatchesFilter(device, undefined, needle)),
+    [devices, statusFilter, needle],
+  );
+  const matches = useMemo(() => (needle || statusFilter !== "all" ? new Set(filtered.map((device) => device.ip)) : null), [needle, statusFilter, filtered]);
+  const selected = devices.find((device) => device.ip === selectedIP);
+  const up = devices.filter((device) => device.alive).length;
+  const openPorts = devices.reduce((sum, device) => sum + device.open_ports.length, 0);
+  const filtersOn = Boolean(needle) || statusFilter !== "all";
 
-// textCompare sorts case-insensitively with blanks last, matching the
-// desktop table's behavior.
-function textCompare(a: string, b: string) {
-  if (!a && !b) return 0;
-  if (!a) return 1;
-  if (!b) return -1;
-  return a.localeCompare(b, undefined, { sensitivity: "base" });
-}
+  const detail = selected && <DeviceDetail host={selected} onClose={() => setSelectedIP("")} />;
 
-function compareIP(a: string, b: string) {
-  const left = a.split(".").map(Number);
-  const right = b.split(".").map(Number);
-  for (let i = 0; i < 4; i += 1) {
-    if (left[i] !== right[i]) return left[i] - right[i];
-  }
-  return 0;
-}
-
-function compareDevices(a: Device, b: Device, key: SortKey) {
-  switch (key) {
-    case "hostname":
-      return textCompare(a.hostname || "", b.hostname || "");
-    case "mac":
-      return textCompare(a.mac_address || "", b.mac_address || "");
-    case "vendor":
-      return textCompare(a.vendor || "", b.vendor || "");
-    case "status":
-      return (b.alive ? 1 : 0) - (a.alive ? 1 : 0);
-    case "ports":
-      return b.open_ports.length - a.open_ports.length;
-    case "type":
-      return textCompare(a.device_type, b.device_type);
-    case "last_seen":
-      return Date.parse(a.last_updated || "") - Date.parse(b.last_updated || "");
-    default:
-      return 0;
-  }
-}
-
-function DeviceTable({ devices }: { devices: Device[] }) {
-  const filter = "";
-  const [sortKey, setSortKey] = useState<SortKey>("ip");
-  const [sortAsc, setSortAsc] = useState(true);
-
-  const visible = useMemo(() => {
-    const needle = filter.trim().toLowerCase();
-    const filtered = needle
-      ? devices.filter((device) =>
-          [
-            device.ip,
-            device.hostname || "",
-            device.mac_address || "",
-            device.vendor || "",
-            device.device_type,
-            device.alive ? "up" : "down",
-            device.open_ports.map((port) => `${port.port} ${port.service}`).join(" "),
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(needle)
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <PageHeader
+        title="Network"
+        subtitle={`The latest devices your probe reported${cidr ? ` for ${cidr}` : ""}${server.refreshedAt ? ` · updated ${server.refreshedAt.toLocaleTimeString()}` : ""}.`}
+        status={server.load.status === "ready" ? <StatusChip tone={freshness.tone} label={freshness.label} /> : undefined}
+        actions={actions}
+      />
+      {server.load.status === "loading" && <LinearProgress aria-label="Loading the inventory" />}
+      {server.error && (
+        <Box sx={{ px: { xs: 2, sm: 3 }, pt: 2 }}>
+          <ErrorNotice error={{ ...server.error, lead: `${server.error.lead}${server.state ? " Showing the last data received." : ""}` }} />
+        </Box>
+      )}
+      {server.load.status === "ready" && devices.length === 0 ? (
+        <Box sx={{ flex: 1, display: "grid", placeItems: "center" }}>
+          <EmptyState
+            icon={SensorsOutlined}
+            title={server.state ? "No devices reported yet" : "Can't reach the server yet"}
+            action={
+              <Stack direction="row" spacing={1} sx={{ justifyContent: "center" }}>
+                <Button variant="contained" onClick={onSetUpProbe}>
+                  Connect a probe
+                </Button>
+                <Button href="?demo">See sample data</Button>
+              </Stack>
+            }
+          >
+            Devices appear here after a probe finishes its first scan and reports to this server.
+          </EmptyState>
+        </Box>
+      ) : (
+        server.load.status === "ready" && (
+          <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
+            <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+              <Stack direction="row" spacing={1.5} useFlexGap sx={{ alignItems: "center", flexWrap: "wrap", px: { xs: 2, sm: 3 }, py: 1.5 }}>
+                <ToggleButtonGroup exclusive value={view} onChange={(_, value) => value && onViewChange(value)} aria-label="Network view">
+                  <ToggleButton value="devices" sx={{ px: 1.5, gap: 0.75 }}>
+                    <TableRowsOutlined fontSize="small" />
+                    Devices
+                  </ToggleButton>
+                  <ToggleButton value="map" sx={{ px: 1.5, gap: 0.75 }}>
+                    <HubOutlined fontSize="small" />
+                    Map
+                  </ToggleButton>
+                </ToggleButtonGroup>
+                <TextField
+                  type="search"
+                  placeholder="Search devices"
+                  value={search}
+                  onChange={(event) => onSearchChange(event.target.value)}
+                  sx={{ flex: "1 1 200px", maxWidth: 340 }}
+                  slotProps={{
+                    htmlInput: { "aria-label": "Find a device" },
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchOutlined fontSize="small" />
+                        </InputAdornment>
+                      ),
+                      endAdornment: search && (
+                        <InputAdornment position="end">
+                          <IconButton aria-label="Clear search" onClick={() => onSearchChange("")} edge="end">
+                            <CloseOutlined fontSize="small" />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+                <TextField select label="Status" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} sx={{ width: 140 }}>
+                  <MenuItem value="all">All devices</MenuItem>
+                  <MenuItem value="up">Up</MenuItem>
+                  <MenuItem value="down">Down</MenuItem>
+                </TextField>
+                <Typography variant="body2" color="text.secondary" sx={{ ml: { md: "auto" } }} role="status">
+                  {filtersOn ? `${filtered.length} of ${devices.length} devices` : `${devices.length} devices`} · {up} up · {openPorts} open ports
+                </Typography>
+              </Stack>
+              {filtersOn && filtered.length === 0 ? (
+                <EmptyState
+                  icon={SearchOffOutlined}
+                  title="No matching devices"
+                  compact
+                  action={
+                    <Button
+                      onClick={() => {
+                        onSearchChange("");
+                        onStatusFilterChange("all");
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  }
+                >
+                  Nothing matches the current search and status.
+                </EmptyState>
+              ) : view === "devices" ? (
+                <DeviceTable hosts={filtered} columns={SERVER_COLUMNS} selectedIP={selectedIP} onSelect={setSelectedIP} label="Latest device inventory" empty={null} />
+              ) : (
+                <Topology hosts={devices} selectedIP={selectedIP} onSelect={setSelectedIP} matches={matches} />
+              )}
+            </Box>
+            {wide && detail && (
+              <Paper square sx={{ width: 360, flexShrink: 0, borderTop: 0, borderBottom: 0, borderRight: 0 }}>
+                {detail}
+              </Paper>
+            )}
+          </Box>
         )
-      : devices;
-    return [...filtered].sort((a, b) => {
-      const order = compareDevices(a, b, sortKey) || compareIP(a.ip, b.ip);
-      return sortAsc ? order : -order;
-    });
-  }, [devices, filter, sortKey, sortAsc]);
+      )}
+      {!wide && (
+        <Drawer
+          anchor="right"
+          variant="persistent"
+          open={Boolean(detail)}
+          onKeyDown={(event) => event.key === "Escape" && setSelectedIP("")}
+          slotProps={{ paper: { sx: { width: 340, maxWidth: "100%", boxShadow: 8, borderLeft: 1, borderColor: "divider" } } }}
+        >
+          {detail}
+        </Drawer>
+      )}
+    </Box>
+  );
+}
 
-  function toggleSort(key: SortKey) {
-    if (key === sortKey) {
-      setSortAsc((asc) => !asc);
-    } else {
-      setSortKey(key);
-      setSortAsc(true);
+function ProbesPage({ server, freshness, actions }: { server: Server; freshness: Freshness; actions: React.ReactNode }) {
+  const toast = useToast();
+  const probe = server.state?.probe;
+  const command = `netviz-probe -url ${window.location.origin} -key <ingest key> -cidr 192.168.1.0/24`;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(command);
+      toast("Command copied");
+    } catch {
+      toast("Couldn't reach the clipboard", "warning");
     }
   }
 
   return (
-    <>
-      <table>
-        <thead>
-          <tr>
-            {DEVICE_COLUMNS.map((column) => (
-              <th key={column.key} aria-sort={sortKey === column.key ? (sortAsc ? "ascending" : "descending") : undefined}>
-                <button type="button" className="sortHeader" onClick={() => toggleSort(column.key)}>
-                  {column.label}
-                  {sortKey === column.key && <span className="sortArrow" aria-hidden="true">{sortAsc ? "▲" : "▼"}</span>}
-                </button>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {visible.map((device) => (
-            <tr key={device.ip}>
-              <td>{device.ip}</td>
-              <td>{device.hostname || ""}</td>
-              <td>{device.mac_address || ""}</td>
-              <td>{device.vendor || ""}</td>
-              <td>
-                <span className={`statusPill ${device.alive ? "up" : "down"}`}>
-                  {device.alive ? "up" : "down"}
-                </span>
-              </td>
-              <td>{device.open_ports.map((port) => port.port).join(", ")}</td>
-              <td>{device.device_type}</td>
-              <td>{formatTime(device.last_updated)}</td>
-            </tr>
-          ))}
-          {visible.length === 0 && (
-            <tr>
-              <td className="empty" colSpan={8}>
-                No devices match the filter.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </>
+    <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <PageHeader
+        title="Probes"
+        subtitle="A probe scans its network on a schedule and reports here. The server never scans anything itself."
+        status={server.load.status === "ready" ? <StatusChip tone={freshness.tone} label={freshness.label} /> : undefined}
+        actions={actions}
+      />
+      <Stack spacing={2} sx={{ p: { xs: 2, sm: 3 }, overflow: "auto", maxWidth: 960 }}>
+        {probe && (
+          <Paper component="section" aria-labelledby="probe-heading" sx={{ p: 2 }}>
+            <Typography id="probe-heading" variant="h2" sx={{ mb: 1.5 }}>
+              Connected probe
+            </Typography>
+            <Box component="dl" sx={{ m: 0, display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 2, rowGap: 0.75 }}>
+              {[
+                ["Last heartbeat", new Date(probe.last_seen).toLocaleString()],
+                ["Network", probe.cidr || "Not reported"],
+                ["Version", probe.version || "Not reported"],
+              ].map(([label, value]) => (
+                <Box key={label} sx={{ display: "contents" }}>
+                  <Typography component="dt" variant="body2" color="text.secondary">
+                    {label}
+                  </Typography>
+                  <Typography component="dd" variant="body2" sx={{ m: 0 }}>
+                    {value}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+              A heartbeat means the probe is reporting. Device updates arrive after each of its scans.
+            </Typography>
+          </Paper>
+        )}
+        <Paper component="section" aria-labelledby="connect-heading" sx={{ p: 2 }}>
+          <Typography id="connect-heading" variant="h2" sx={{ mb: 1 }}>
+            {probe ? "Connect another network" : "Connect a probe"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            Run netviz-probe on a machine inside the network you want to see. It reports to this server after its first scan.
+          </Typography>
+          <Box
+            component="pre"
+            sx={{ m: 0, p: 1.5, borderRadius: 1, bgcolor: "action.hover", fontFamily: monoFont, fontSize: 12.5, whiteSpace: "pre-wrap", wordBreak: "break-all" }}
+          >
+            {command}
+          </Box>
+          <Button startIcon={<ContentCopyOutlined />} onClick={() => void copy()} sx={{ mt: 1 }}>
+            Copy command
+          </Button>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+            The ingest key is set on the server with <code>-ingest-key</code> or the <code>NETVIZ_INGEST_KEY</code> environment variable. The desktop app can install the probe as a
+            service for you. Curious first? <Link href="?demo">Open sample data</Link>.
+          </Typography>
+        </Paper>
+      </Stack>
+    </Box>
   );
-}
-
-function StatTile({ label, value, detail }: { label: string; value: number | string; detail?: string }) {
-  return (
-    <div className="tile">
-      <span className="tileLabel">{label}</span>
-      <strong className="tileValue">{value}</strong>
-      {detail && <span className="tileDetail">{detail}</span>}
-    </div>
-  );
-}
-
-function ProbeBadge({ probe }: { probe?: ProbeStatus }) {
-  if (!probe) {
-    return <span className="probeBadge none">no probe heartbeat yet</span>;
-  }
-  const ageMs = Date.now() - new Date(probe.last_seen).getTime();
-  const stale = ageMs > PROBE_STALE_MS;
-  return (
-    <span className={`probeBadge ${stale ? "stale" : "fresh"}`}>
-      probe {stale ? "stale" : "online"} · seen {formatAge(ageMs)} ago
-      {probe.cidr ? ` · ${probe.cidr}` : ""}
-    </span>
-  );
-}
-
-function EmptyState({ connected, setup = false }: { connected: boolean; setup?: boolean }) {
-  return (
-    <div className="emptyState">
-      <h2>{setup ? "Connect a probe" : connected ? "No device pushes yet" : "Connecting to server"}</h2>
-      <p>
-        Point a probe at this server and it will appear here after its first
-        scan cycle:
-      </p>
-      <pre>netviz-probe -url http://&lt;this-host&gt;:8080 -key &lt;ingest key&gt; -cidr 192.168.1.0/24</pre>
-      <p className="quiet">
-        The ingest key is set on the server with <code>-ingest-key</code> or the
-        <code> NETVIZ_INGEST_KEY</code> environment variable. Curious what the
-        map looks like? Open <a href="?demo">?demo</a> for sample data.
-      </p>
-    </div>
-  );
-}
-
-function formatTime(value: string) {
-  if (!value) return "";
-  return new Date(value).toLocaleString();
-}
-
-function formatAge(ms: number) {
-  const seconds = Math.max(0, Math.floor(ms / 1000));
-  if (seconds < 90) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 90) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h`;
 }
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
-  </React.StrictMode>
+    <NetvizRoot>
+      <App />
+    </NetvizRoot>
+  </React.StrictMode>,
 );

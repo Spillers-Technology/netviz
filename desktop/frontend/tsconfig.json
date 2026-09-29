@@ -10,13 +10,18 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "paths": {
+      "@netviz/ui": ["../../ui/src/index.ts"],
+      "@netviz/ui/*": ["../../ui/src/*"],
+      "*": ["./node_modules/@types/*", "./node_modules/*"]
+    }
   },
-  "include": ["src"],
+  "include": ["src", "../../ui/src"],
   "references": []
 }
-
