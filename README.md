@@ -16,7 +16,7 @@ No agents. No accounts. No Nmap. Just download and run.
 > **Authorized use only.** Scan networks you own or have explicit permission to
 > scan.
 
-**Current release: v1.0.0.** Windows builds are code-signed.
+**Current release: v1.1.0.** Windows builds are code-signed.
 
 ---
 

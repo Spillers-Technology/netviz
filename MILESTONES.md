@@ -378,7 +378,7 @@ validation pass. The stability commitments shipped with v0.9.0:
   file formats, SQLite schema migration).
 - Security posture and threat model documented (SECURITY.md).
 
-Status: prepared September 20, 2026; ships when the v1.0.0 release is published.
+Status: shipped September 20, 2026.
 
 Shipped in 1.0.0:
 
@@ -396,7 +396,7 @@ Deferred (not done for 1.0.0):
 - Signing for the Linux archive.
 - One live sign-in validation against the production IdP (OIDC is covered by
   in-process issuer tests; see v0.9.0).
-- Screenshot refresh and a final docs pass.
+- Screenshot refresh and a final docs pass (done in v1.1.0).
 
 Acceptance criteria:
 
@@ -409,3 +409,15 @@ Acceptance criteria:
   platforms.
 - Upgrading from the previous release preserves local history and probe
   config.
+
+
+## v1.1.0: Redesigned Desktop and Server UI
+
+Status: shipped September 29, 2026.
+
+Both frontends rebuilt on a shared design system (`ui/`, MUI, light and dark),
+workspaces instead of tabs in the desktop app, and a three.js 3D topology map
+with a flat-map fallback replacing the hierarchy view and the server's canvas
+map. UI validation (overflow, browser errors, blank 3D map) runs in CI across
+both themes and window sizes. No wire contract, CLI flag, file format, or
+SQLite schema changes. See [CHANGELOG.md](CHANGELOG.md).

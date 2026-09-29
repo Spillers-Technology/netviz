@@ -6,7 +6,7 @@ kept in the repo root as a historical record; that practice was retired
 starting with v0.3.0 in favor of this file. See [RELEASING.md](RELEASING.md)
 for the release process.
 
-## Unreleased
+## v1.1.0 — 2026-09-29
 
 **A redesigned desktop app and server UI.** Both frontends now share one design
 system and component kit (`ui/`), built on MUI with light and dark themes that

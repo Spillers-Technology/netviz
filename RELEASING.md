@@ -163,7 +163,7 @@ Version and docs:
 
 Functional spot checks:
 
-- Desktop: scan a real /24; table, graph, and hierarchy stay responsive
+- Desktop: scan a real /24; Devices, Groups, and Topology (3D and flat) stay responsive
 - Server: `?demo` map renders; probe push creates then updates without
   duplicates; bad key gets 401; no key gets 503
 - Probe: `-once` push against a live AnchorDesk or netviz-server
