@@ -19,11 +19,43 @@ jobs:
         run: go test ./...
       - name: Go vet
         run: go vet ./...
-      - name: Build web placeholder
+      - name: Build server web app
         run: |
           npm ci --prefix web
           npm run --prefix web build
+      - name: Committed server web build matches its source
+        run: git diff --exit-code --stat -- internal/server/webdist
       - name: Build desktop frontend
         run: |
           npm ci --prefix desktop/frontend
           npm run --prefix desktop/frontend build
+      - name: Frontend unit tests (shared ui kit and desktop)
+        run: npm test --prefix desktop/frontend
+
+  # UI validation (company standard STD-008) runs on a GitHub-hosted runner, like
+  # the Release guard: Playwright's browser dependencies need root to install, and
+  # the self-hosted Linux runner is an unprivileged container. It needs only Node.
+  ui-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build both frontends
+        run: |
+          npm ci --prefix web
+          npm run --prefix web build
+          npm ci --prefix desktop/frontend
+          npm run --prefix desktop/frontend build
+      - name: Validate workspace layouts and navigation
+        run: |
+          npm ci --prefix docs/scripts
+          cd docs/scripts
+          npx playwright install --with-deps chromium
+          npm run capture
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: workspace-captures
+          path: docs/assets/workspaces

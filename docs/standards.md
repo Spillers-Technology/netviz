@@ -1,6 +1,6 @@
 # Company standards status
 
-Reconciled 2026-08-25 against `corporate-strategy/standards/STD-001` through
+Reconciled 2026-08-25 (STD-008 row updated 2026-09-29) against `corporate-strategy/standards/STD-001` through
 `STD-008` and this branch. Re-verify these claims against the live repo when the
 standards or implementation changes.
 
@@ -13,4 +13,4 @@ standards or implementation changes.
 | STD-005 agent surface | not-yet | No MCP or equivalent agent-facing control surface is shipped. |
 | STD-006 secret handling | adopted by scope | Probe/API credentials are injected by config or environment and are never committed in deployment manifests; no deployment secret is stored in this repo. |
 | STD-007 repo metadata | adopted (partial) | LICENSE and CHANGELOG exist and the release-notes convention is now explicit; company-wide rights-holder and AI-attribution conventions remain undecided. |
-| STD-008 UI capture validation | not-yet | A desktop documentation capture script exists, but it has no overflow/error assertion and is not run in CI. |
+| STD-008 UI capture validation | adopted (pending first CI run) | `docs/scripts/validation.mjs` asserts no horizontal overflow and no browser errors before every capture, and that the 3D map is not blank; `npm run capture` covers every desktop and server view in light and dark at laptop and minimum window sizes (plus 390px for the server UI), and CI runs it on every push. Adopted on `feat/cohesive-workspaces`; confirm the first green CI run before calling this fully adopted. |

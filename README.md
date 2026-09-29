@@ -1,11 +1,11 @@
 # NetViz
-<img width="2160" height="1440" alt="NetViz table view listing hosts with IP, hostname, MAC, vendor, monitor state, open ports, and device type" src="docs/assets/view-table.png" />
+<img width="2160" height="1440" alt="NetViz Devices view: a table of devices with IP address, name and vendor, what changed, type and open ports, with one device's details open on the right" src="docs/assets/view-devices.png" />
 
 **See everything on your local network — in seconds, with one download.**
 
 NetViz is a free, open-source LAN scanner and network visualizer for Windows and
 Linux. Point it at your network, hit scan, and watch devices appear live as a
-table, a grouped graph, and a clickable map. Leave it running and it tells you
+list, in groups by type, and on a 3D map. Leave it running and it tells you
 what changed: new devices, devices that went offline, devices whose ports moved.
 
 It's a modern take on tools like Advanced IP Scanner and Angry IP Scanner, built
@@ -16,7 +16,7 @@ No agents. No accounts. No Nmap. Just download and run.
 > **Authorized use only.** Scan networks you own or have explicit permission to
 > scan.
 
-**Current release: v1.0.0.** Windows builds are code-signed.
+**Current release: v1.1.0.** Windows builds are code-signed.
 
 ---
 
@@ -59,16 +59,17 @@ are deferred.
 ## Quick start
 
 1. Launch **NetViz**.
-2. Enter the network to scan as a CIDR, such as `192.168.1.0/24`.
-3. Click **Start Scan**. Devices stream in as they're found.
-4. Switch between the **Table**, **Graph**, and **Hierarchy** tabs to look at the
-   same scan three ways.
+2. NetViz fills in the network this PC is on, such as `192.168.1.0/24`. Change it
+   if you want to scan a different range.
+3. Click **Scan**. Devices stream in as they're found; click one for its details.
+4. Switch between **Devices**, **Groups**, and **Topology** to look at the same
+   scan three ways.
 5. Click **Monitor** to re-scan on the interval you pick and flag what changes.
-   The **History** tab keeps past scans so you can compare them.
+   **History** keeps past scans so you can compare them.
 
 <p>
-  <img width="49%" alt="Graph view: devices grouped by inferred category with open-port badges" src="docs/assets/view-graph.png" />
-  <img width="49%" alt="Hierarchy map: a firewall at the center with clickable device circles around it" src="docs/assets/view-hierarchy.png" />
+  <img width="49%" alt="Topology view in the dark theme: a 3D map with the gateway at the center and devices clustered by type around it" src="docs/assets/view-topology-dark.png" />
+  <img width="49%" alt="Groups view: one card per device type listing its devices" src="docs/assets/view-groups.png" />
 </p>
 
 ---
@@ -79,11 +80,13 @@ are deferred.
   common LAN ports while results stream in. No raw packets, no SYN scans, no
   special drivers.
 - **Three views of one scan.**
-  - **Table:** IP, hostname, MAC, vendor, alive status, open ports, guessed
-    device type, and first-seen and last-updated times.
-  - **Graph:** devices grouped by inferred category, with open-port badges.
-  - **Hierarchy map:** a firewall at the center with clickable device circles
-    around it, built to stay readable on a `/24`.
+  - **Devices:** IP, name and vendor, what changed, type, open ports, MAC, and
+    first- and last-seen times, with each device's details and history on click.
+  - **Groups:** one card per device type that's present.
+  - **Topology:** a 3D map with the gateway at the center and each device type
+    as a cluster around it; taller devices have more open ports. It stays smooth
+    well past a `/24`, and falls back to a flat map where 3D isn't available.
+- **Light and dark themes** that follow your system, or pick one in Settings.
 - **Monitor mode.** Re-scans on an interval and marks every device **new,
   online, offline, changed,** or **stable**, so you can watch the network move.
 - **Names and vendors.** Hostname resolution plus MAC and vendor lookup (IEEE
@@ -109,15 +112,15 @@ network and get a live device inventory back at your desk.
 
 - **[Headless probe](#headless-probe)** runs unattended as a Windows service,
   systemd unit, or launchd daemon, scans on a schedule, and pushes what it finds
-  to your backend. You can set one up from the **Probe** tab in the desktop app.
-- **[Server mode](#server-mode)** collects probe data into a web UI with an
-  interactive network map. Run it from Docker in one command, and put it behind
+  to your backend. You can set one up from the **Probe** page in the desktop app.
+- **[Server mode](#server-mode)** collects probe data into a web UI with the same
+  3D network map as the desktop app. Run it from Docker in one command, and put it behind
   SSO (OIDC) when it's exposed beyond a trusted LAN.
 - **AnchorDesk** integration: probes push devices to an AnchorDesk backend so
   live device inventory shows up alongside tickets.
 
-<img width="49%" alt="Probe tab: configure reporting and install the persistent probe service" src="docs/assets/view-probe.png" />
-<img width="49%" alt="History tab: compare two saved scans to see which devices are new, missing, or changed" src="docs/assets/view-history.png" />
+<img width="49%" alt="Probe page: configure reporting and install the persistent probe service" src="docs/assets/view-probe.png" />
+<img width="49%" alt="History: compare two saved scans to see which devices joined, left, or changed" src="docs/assets/view-history.png" />
 
 ---
 
@@ -285,15 +288,15 @@ ScanEngine -> EventBus -> Consumers
 ```
 
 The scanner core (`internal/scanner`) has no dependency on Wails, React, the
-HTTP server, storage, or UI code. Every view (table, graph, hierarchy, CLI
+HTTP server, storage, or UI code. Every view (devices, groups, topology, CLI
 JSON, file export, and SQLite history) consumes the same typed event stream.
 
 ```text
-Current consumers   Desktop table · grouped graph · hierarchy map
+Current consumers   Desktop devices · groups · 3D topology
                     CLI JSON output · file save/open · CSV export
                     SQLite history + diff · monitor mode
                     netviz-probe AnchorDesk reporter
-                    netviz-server ingest + web UI network map
+                    netviz-server ingest + web UI (devices + 3D map)
 
 Future consumers    websocket event streamer
 ```
@@ -301,19 +304,23 @@ Future consumers    websocket event streamer
 ### Docs screenshots
 
 The product screenshots on the [GitHub Pages site](docs/index.html) and in this
-README are captured from the real desktop frontend with mocked scan data; no
-live network is required. To regenerate them after a UI change:
+README are captured from the real frontends with synthetic data; no live network
+is required. The same run is the UI validation CI performs: every view, in light
+and dark, at laptop and minimum window sizes (and phone width for the server UI),
+fails on horizontal overflow, browser errors, or a blank 3D map.
 
 ```sh
-cd desktop/frontend && npm run dev          # serve the app on 127.0.0.1:5173
-node docs/scripts/capture-desktop-media.mjs # writes docs/assets/view-*.png
+npm run build --prefix desktop/frontend && npm run build --prefix web
+npm ci --prefix docs/scripts && npx --prefix docs/scripts playwright install chromium
+npm run capture --prefix docs/scripts       # validates; writes docs/assets/workspaces/
 ```
 
-The script injects a mock Wails bridge (Playwright `addInitScript`) and replays
-a baseline + monitor scan, so the table, graph, hierarchy, history, probe, and
-update views all render with realistic devices and monitor states. Playwright is
-loaded from `PLAYWRIGHT_NODE_MODULES` if set; see the script header for the
-one-time install hint.
+To refresh the published `docs/assets/view-*.png` images, serve the desktop
+build (`npx vite preview --port 5173` in `desktop/frontend`) and run
+`NETVIZ_PUBLISH_SCREENSHOTS=1 node docs/scripts/capture-desktop-media.mjs`. The
+script injects a mock Wails bridge (Playwright `addInitScript`) and replays a
+baseline + monitor scan, so every workspace renders with realistic devices and
+monitor states.
 
 ---
 

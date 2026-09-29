@@ -69,6 +69,12 @@ func (a *App) DefaultPorts() []scanner.PortDef {
 	return scanner.DefaultPortDefs
 }
 
+// DetectNetworks lists the private IPv4 networks this machine is on, likeliest
+// first, so the range field can start from the user's own network.
+func (a *App) DetectNetworks() []string {
+	return scanner.LocalNetworks()
+}
+
 func (a *App) startScan(cidr string, ports []int, preserveResults bool) error {
 	if err := scanner.ValidateCIDR(cidr); err != nil {
 		return err
@@ -139,7 +145,9 @@ func (a *App) ExportCSV() (string, error) {
 	return hostsToCSV(hosts)
 }
 
-func (a *App) SaveScanFile() error {
+// SaveScanFile reports whether a file was written; false with no error means
+// the user cancelled the dialog.
+func (a *App) SaveScanFile() (bool, error) {
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Save NetViz Scan",
 		DefaultFilename: "netviz-scan.json",
@@ -149,10 +157,10 @@ func (a *App) SaveScanFile() error {
 		CanCreateDirectories: true,
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
 	if path == "" {
-		return nil
+		return false, nil
 	}
 
 	payload := SavedScanFile{
@@ -162,9 +170,12 @@ func (a *App) SaveScanFile() error {
 	}
 	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
-		return err
+		return false, err
 	}
-	return os.WriteFile(path, data, 0o644)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (a *App) OpenScanFile() ([]model.HostObservation, error) {
@@ -210,7 +221,9 @@ func (a *App) EmitCurrentResults() {
 	runtime.EventsEmit(a.ctx, "scan:loaded", a.snapshotHosts())
 }
 
-func (a *App) SaveCSVFile() error {
+// SaveCSVFile reports whether a file was written; false with no error means
+// the user cancelled the dialog.
+func (a *App) SaveCSVFile() (bool, error) {
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Save NetViz CSV",
 		DefaultFilename: "netviz-scan.csv",
@@ -220,16 +233,19 @@ func (a *App) SaveCSVFile() error {
 		CanCreateDirectories: true,
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
 	if path == "" {
-		return nil
+		return false, nil
 	}
 	content, err := hostsToCSV(a.snapshotHosts())
 	if err != nil {
-		return err
+		return false, err
 	}
-	return os.WriteFile(path, []byte(content), 0o644)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func hostsToCSV(hosts []model.HostObservation) (string, error) {

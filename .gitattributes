@@ -1,0 +1,4 @@
+# The server web build is committed and CI checks that a fresh build on Linux
+# matches it byte for byte, so its source and output use LF on every platform.
+web/index.html text eol=lf
+internal/server/webdist/** text eol=lf

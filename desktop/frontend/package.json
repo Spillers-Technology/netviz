@@ -6,18 +6,32 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.4.0",
+    "@mui/material": "^9.4.0",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.1",
+    "@react-three/postprocessing": "^3.1.3",
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.7",
+    "postprocessing": "^6.39.5",
+    "react": "~19.2.7",
+    "react-dom": "~19.2.7",
+    "three": "^0.186.1",
     "typescript": "^5.7.2",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "vite": "^6.0.7"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^19.0.2",
-    "@types/react-dom": "^19.0.2"
+    "@types/react-dom": "^19.0.2",
+    "@types/three": "^0.186.0",
+    "jsdom": "^30.1.1",
+    "vitest": "^5.0.2"
   }
 }
-

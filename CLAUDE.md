@@ -144,6 +144,34 @@ Use Go 1.25 or newer. The SQLite history store uses the pure-Go
 - Keep frontend controls dense and operational, not marketing-style.
 - For visualization changes, preserve responsiveness for `/24` scans.
 
+## UX rules
+
+Both frontends (`desktop/frontend`, `web`) build on the shared kit in `ui/`
+(source only, consumed through a Vite alias; see `ui/vite.shared.ts`). Put
+anything used by both apps there, not in either app.
+
+- **Tokens live in `ui/src/theme.ts`**, never as hex literals in components.
+  Device-type colors live in `ui/src/categories.tsx` and were validated as a
+  palette in ring order; don't reorder or add hues without re-validating.
+- **Every screen has one primary action.** Name what it does ("Scan
+  192.168.1.0/24", "Install probe…"); a trailing "…" means a dialog or another
+  screen follows. Occasional actions go under More.
+- **Hide actions that can't apply; don't show them disabled.** A tooltip
+  explains the rare disabled control.
+- **Status shows once**, as a `StatusChip` (icon + words, never color alone).
+- **Every mutating action goes through `useConfirm`** with `items` listing
+  exactly what will change; destructive ones use `destructive`.
+- **Errors use `friendlyError`/`ErrorNotice`**: a plain sentence first, the
+  original text under Details. Each area keeps its own error (`useAsyncAction`).
+- **Every async view has loading, empty and ready states**; empty states have
+  one sentence and at most one action.
+- **Copy:** sentence case, second person, contractions, and say what does *not*
+  happen ("Nothing leaves this PC", "Nothing changes until you confirm").
+- **Validate UI changes** with `npm run capture --prefix docs/scripts` (STD-008):
+  both color schemes, laptop and minimum window sizes, no overflow, no browser
+  errors, 3D map not blank. Refresh published screenshots with
+  `NETVIZ_PUBLISH_SCREENSHOTS=1` (see README "Docs screenshots").
+
 ## Safety and Security Boundaries
 
 NetViz should only scan networks the user owns or is authorized to scan. Keep the

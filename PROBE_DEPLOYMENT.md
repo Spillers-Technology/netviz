@@ -35,24 +35,29 @@ breaks ARP discovery and other LAN-local behavior.
 
 ## Desktop GUI provisioning
 
-The desktop app includes a **Probe** tab that can provision the same
+The desktop app includes a **Probe** page that can provision the same
 `netviz-probe` service used by the command line:
 
 1. Open the desktop app with the privileges required by the host OS service
    manager. On Windows this usually means **Run as administrator**. On Linux
    and macOS, command-line installation with `sudo` is still the most reliable
    path unless the desktop session already has the needed service permissions.
-2. Enter the scan CIDR in the main toolbar. The Probe tab uses that same CIDR.
-3. Enter the AnchorDesk URL, probe API key, and scan/heartbeat interval.
-4. Keep **Install persistent probe service** checked and click
-   **Provision Probe**. The GUI copies `netviz-probe` to the standard install
+2. Under **Connection**, enter the network range to report. It starts as the
+   range on the Network page but is the probe's own setting: changing one never
+   changes the other.
+3. Enter the server address (AnchorDesk or netviz-server), probe key, and report
+   interval. **Finish setting up** lists anything still missing.
+4. Keep **Run as a service that starts with this PC** on and click
+   **Install probe…**. A confirmation lists exactly what will change; nothing
+   happens until you confirm. The GUI copies `netviz-probe` to the standard install
    location — `C:\Program Files\NetViz\netviz-probe.exe` on Windows,
    `/usr/local/bin/netviz-probe` on Linux and macOS — writes a shared probe
    config file, installs the service as `netviz-probe run -config <path>` from
-   that install location, then starts the service if **Start service after
-   install** is checked.
-5. Use **Refresh**, **Start**, **Stop**, **Restart**, or **Uninstall** in the
-   Probe tab to manage the registered service.
+   that install location, then starts the service if **Start the service right
+   away** is on.
+5. Use **Refresh**, **Start**, **Stop**, **Restart**, or **Uninstall…** on the
+   Probe page to manage the registered service. Only the actions that apply to
+   the service's current state are shown.
 
 The GUI finds `netviz-probe` on its own: it prefers the copy at the standard
 install location and falls back to the binary shipped alongside the desktop
@@ -61,13 +66,13 @@ desktop upgrades carry the probe forward). **Locate netviz-probe…** appears
 only when neither is found — for example when the desktop binary was moved out
 of its release archive.
 
-When the Probe tab opens, it reads the existing shared config file and fills in
-the CIDR, AnchorDesk URL, key, and interval. Repeating **Provision Probe** is
+When the Probe page opens, it reads the existing shared config file and fills in
+the range, server address, key, and interval. Repeating **Update probe…** is
 idempotent for GUI-managed probes: it updates the config file and keeps the
 service pointed at the same file. The running service re-reads that file before
 each scan cycle, so edits are picked up without a manual restart.
 
-Uncheck **Install persistent probe service** to run a foreground `-once` push
+Turn off **Run as a service that starts with this PC** to run a foreground `-once` push
 from the GUI instead of installing the service. This is useful as a connectivity
 smoke test, but it is not durable because it depends on the desktop session.
 
@@ -187,8 +192,8 @@ line. By default the file is:
 Treat the host and config file as credential-bearing infrastructure and rotate
 the probe key when the host is retired or compromised.
 
-To change the CIDR, interval, URL, or key for a GUI-managed probe, edit the
-Probe tab and click **Provision Probe**. The service re-reads the config before
+To change the range, interval, server address, or key for a GUI-managed probe,
+edit them on the Probe page and click **Update probe…**. The service re-reads the config before
 its next scan cycle.
 
 ## Upgrade
