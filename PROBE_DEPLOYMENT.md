@@ -5,8 +5,8 @@ LAN, scans one IPv4 CIDR on an interval, pushes inventory to its backend, and
 sends heartbeat reports between scans.
 
 The probe speaks one wire contract to two interchangeable backends: an
-AnchorDesk instance, or a self-hosted `netviz-server` (Docker image at
-`ghcr.io/spillers-technology/netviz` — see the README's Server mode section).
+AnchorDesk instance, or a self-hosted `netviz-server` (Docker; the published image
+is stale, so see the README's Server mode section).
 Everything in this guide applies to both; only the URL and key differ. For a
 netviz-server backend the key is the server's `NETVIZ_INGEST_KEY`.
 
