@@ -1,6 +1,8 @@
 services:
   netviz:
-    image: ghcr.io/spillers-technology/netviz:latest
+    image: netviz:local
+    # Build locally rather than pulling: the published image is stale (#21).
+    pull_policy: build
     build:
       context: ..
       dockerfile: deploy/Dockerfile

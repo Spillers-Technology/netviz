@@ -114,7 +114,7 @@ network and get a live device inventory back at your desk.
   systemd unit, or launchd daemon, scans on a schedule, and pushes what it finds
   to your backend. You can set one up from the **Probe** page in the desktop app.
 - **[Server mode](#server-mode)** collects probe data into a web UI with the same
-  3D network map as the desktop app. Run it from Docker in one command, and put it behind
+  3D network map as the desktop app. Run it from Docker, and put it behind
   SSO (OIDC) when it's exposed beyond a trusted LAN.
 - **AnchorDesk** integration: probes push devices to an AnchorDesk backend so
   live device inventory shows up alongside tickets.
@@ -196,11 +196,18 @@ macOS GUI/CLI install, logging, upgrade, and troubleshooting instructions.
 
 `netviz-server` accepts device pushes from `netviz-probe` (the same v1 wire
 contract used for AnchorDesk) and serves the latest network state as a web UI
-with an interactive canvas network map:
+with the same 3D network map as the desktop app.
+
+> **The published image is stale.** `ghcr.io/spillers-technology/netviz` (`latest`
+> and `0.9.3`) is v0.9.3, from before v1.0 and the v1.1 redesign. Image publishing
+> has been broken since then ([#21](https://github.com/Spillers-Technology/netviz/issues/21)).
+> Until it's fixed, build the image from source:
 
 ```sh
+git clone https://github.com/Spillers-Technology/netviz && cd netviz
+docker build -f deploy/Dockerfile -t netviz .
 docker run -p 8080:8080 -e NETVIZ_INGEST_KEY=your-probe-key \
-  -v netviz-data:/data ghcr.io/spillers-technology/netviz
+  -v netviz-data:/data netviz
 
 # then point a probe at it
 netviz-probe -url http://server-host:8080 -key your-probe-key -cidr 192.168.1.0/24
