@@ -198,20 +198,19 @@ macOS GUI/CLI install, logging, upgrade, and troubleshooting instructions.
 contract used for AnchorDesk) and serves the latest network state as a web UI
 with the same 3D network map as the desktop app.
 
-> **The published image is stale.** `ghcr.io/spillers-technology/netviz` (`latest`
-> and `0.9.3`) is v0.9.3, from before v1.0 and the v1.1 redesign. Image publishing
-> has been broken since then ([#21](https://github.com/Spillers-Technology/netviz/issues/21)).
-> Until it's fixed, build the image from source:
+The public Linux amd64 image for NetViz 1.1.0 uses this digest:
 
 ```sh
-git clone https://github.com/Spillers-Technology/netviz && cd netviz
-docker build -f deploy/Dockerfile -t netviz .
 docker run -p 8080:8080 -e NETVIZ_INGEST_KEY=your-probe-key \
-  -v netviz-data:/data netviz
+  -v netviz-data:/data \
+  ghcr.io/spillers-technology/netviz@sha256:7db718e2d6a750e85b7f16bf681818cb31421221296df07c35c2ff59a863cb40
 
 # then point a probe at it
 netviz-probe -url http://server-host:8080 -key your-probe-key -cidr 192.168.1.0/24
 ```
+
+For other architectures, build from source with `deploy/Dockerfile`.
+The previous image remains available as `0.9.3` for deployments that need it.
 
 Probe endpoints are disabled until an ingest key is configured
 (`-ingest-key` or `NETVIZ_INGEST_KEY`). Open `http://server-host:8080/?demo`
