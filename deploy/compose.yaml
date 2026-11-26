@@ -1,7 +1,7 @@
 services:
   netviz:
     image: netviz:local
-    # Build locally rather than pulling: the published image is stale (#21).
+    # Build for the host architecture.
     pull_policy: build
     build:
       context: ..
