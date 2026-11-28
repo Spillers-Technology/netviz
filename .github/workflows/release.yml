@@ -174,11 +174,10 @@ jobs:
       - name: Resolve release metadata
         id: meta
         shell: pwsh
+        env:
+          NETVIZ_RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
         run: |
-          $tag = "${{ github.event.release.tag_name }}"
-          if ([string]::IsNullOrWhiteSpace($tag)) {
-            $tag = "${{ inputs.tag }}"
-          }
+          $tag = $env:NETVIZ_RELEASE_TAG
           $goos = go env GOOS
           $goarch = go env GOARCH
           "tag=$tag" >> $env:GITHUB_OUTPUT
