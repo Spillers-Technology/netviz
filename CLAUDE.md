@@ -85,7 +85,7 @@ longer accurate. v0.0.1 now includes:
 - No credential handling.
 - No RMM-like workflows.
 - No server ingest before the server milestone.
-- No multi-tenancy at all — AnchorDesk owns tenancy; NetViz stays single-site.
+- NetViz manages multiple sites in one operator console. Sites organize topology and probe assignments within that deployment. AnchorDesk owns its own users, ticket access, and customer records.
 - **No printer driver catalog, no vendor-specific driver resolution, and no printer-driver
   install/mutation logic of any kind.** That is SpoolSmith's job, in SpoolSmith's own repo — see
   `corporate-strategy/board/meetings/2026-09-03-spoolsmith-new-product/04-decision-record.md`

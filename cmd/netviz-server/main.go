@@ -29,9 +29,6 @@ func run() error {
 	flag.Parse()
 
 	key := envFallback(*ingestKey, "NETVIZ_INGEST_KEY")
-	if key == "" {
-		log.Println("warning: no ingest key configured; probe endpoints will answer 503 until -ingest-key or NETVIZ_INGEST_KEY is set")
-	}
 
 	oidc := server.OIDCConfig{
 		Issuer:       envFallback(*oidcIssuer, "NETVIZ_OIDC_ISSUER"),
@@ -55,10 +52,11 @@ func run() error {
 	defer store.Close()
 
 	srv := server.New(server.Config{
-		Store:     store,
-		IngestKey: key,
-		Version:   version.Version,
-		OIDC:      oidc,
+		Store:        store,
+		IngestKey:    key,
+		InventoryKey: os.Getenv("NETVIZ_INVENTORY_KEY"),
+		Version:      version.Version,
+		OIDC:         oidc,
 	})
 	if srv.AuthEnabled() {
 		log.Printf("web sign-in enabled via OIDC issuer %s", oidc.Issuer)

@@ -6,6 +6,20 @@ kept in the repo root as a historical record; that practice was retired
 starting with v0.3.0 in favor of this file. See [RELEASING.md](RELEASING.md)
 for the release process.
 
+## v1.2.0 — 2026-11-27
+
+**Manage multiple sites in the NetViz console.** Register each scanner with a
+site and its own key. Choose a probe to see its topology and latest report.
+Devices without a usable MAC are scoped to their probe, so the same private IP
+at two sites stays distinct.
+
+- Assign a default company to a probe, or set a company for a specific device.
+- Give AnchorDesk a read-only inventory key to import probes, observations, and
+  company assignments. Existing shared-key probe feeds remain available.
+- Rotate a probe key from the console. An existing scanner keeps its v1 report
+  format when you switch its destination and key.
+- Scan only networks and devices you own or have permission to monitor.
+
 ## v1.1.0 — 2026-09-29
 
 **A redesigned desktop app and server UI.** Both frontends now share one design

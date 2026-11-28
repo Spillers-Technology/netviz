@@ -1,5 +1,11 @@
 # MILESTONES
 
+## v1.2.0 — Multi-site probe management
+
+- Managed probe enrollment and per-site topology in the server console.
+- Probe defaults and device-level company assignment.
+- Read-only inventory export for AnchorDesk.
+
 ## v0.0.1: Desktop Scanner and Visualization Release
 
 Goal: release the first useful standalone desktop scanner with live visual

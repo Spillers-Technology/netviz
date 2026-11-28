@@ -20,6 +20,11 @@ No agents. No accounts. No Nmap. Just download and run.
 
 ---
 
+**Managing several sites?** In the NetViz console, register each scanner with
+its own probe key and choose a site. The Network workspace shows the selected
+probe's topology, and the Probes workspace holds company and device assignments.
+See the [probe deployment guide](PROBE_DEPLOYMENT.md#managing-multiple-sites-from-the-netviz-console).
+
 ## Download
 
 Grab the latest build from the
