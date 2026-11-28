@@ -61,6 +61,7 @@ jobs:
           INPUT_TAG: ${{ inputs.tag }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_TITLE: ${{ github.event.workflow_run.display_title }}
           EXPECTED_SUBJECT: ${{ vars.SIGNING_EXPECTED_SUBJECT }}
         run: |
           $ErrorActionPreference = 'Stop'
@@ -70,16 +71,12 @@ jobs:
             throw 'SIGNING_EXPECTED_SUBJECT is not set on the release environment; refusing to verify without knowing the expected publisher.'
           }
 
-          # Which release? A tag from the event when there is one. A manual
-          # rebuild (Release Builds workflow_dispatch) runs on a branch, so its
-          # tag is not in the event; fall back to the newest published release.
-          $tag = @($env:INPUT_TAG, $env:RELEASE_TAG, $(if ($env:RUN_BRANCH -match '^v\d') { $env:RUN_BRANCH })) |
+          # Release events name a tag directly. Manual builds carry it in
+          # their run title so the guard targets that draft or release.
+          $buildTag = if ($env:RUN_TITLE -match '^Release Builds (v\S+)$') { $Matches[1] }
+          $tag = @($env:INPUT_TAG, $env:RELEASE_TAG, $buildTag, $(if ($env:RUN_BRANCH -match '^v\d') { $env:RUN_BRANCH })) |
             Where-Object { $_ } | Select-Object -First 1
-          if (-not $tag) {
-            $tag = gh release list --repo $env:REPO --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName'
-            if ($LASTEXITCODE -ne 0) { throw 'Could not list releases.' }
-          }
-          if (-not $tag) { throw 'No release to verify.' }
+          if (-not $tag) { throw 'Could not determine which release to verify.' }
           Write-Host "Verifying release $tag"
 
           $release = gh release view $tag --repo $env:REPO --json assets,isDraft | ConvertFrom-Json
