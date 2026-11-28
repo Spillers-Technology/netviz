@@ -1,8 +1,6 @@
-// Package server implements the single-tenant netviz server: it accepts the
-// same v1 probe wire contract that AnchorDesk consumes, stores each push as a
-// scan run in the shared SQLite store, and serves the latest network state as
-// JSON and an embedded web UI. Multi-tenancy is deliberately out of scope —
-// AnchorDesk owns tenancy; a netviz server is one site.
+// Package server implements the NetViz console and probe ingest. Managed
+// probes report through v1, while the console stores site assignments,
+// per-probe scan histories, and a separate inventory export.
 package server
 
 import (
@@ -19,14 +17,15 @@ import (
 const maxRunsKept = 500
 
 // Config wires a Server. Store is required for ingest and state endpoints.
-// IngestKey guards the probe endpoints; when empty, ingest is disabled and
-// probes receive 503 until the operator configures a key. OIDC (optional)
-// puts the web UI and read APIs behind SSO sign-in.
+// IngestKey is the legacy shared key. Managed probe keys live in the store.
+// InventoryKey enables the separate read-only export. OIDC puts the console
+// and its management API behind sign-in.
 type Config struct {
-	Store     *storage.SQLiteStore
-	IngestKey string
-	Version   string
-	OIDC      OIDCConfig
+	Store        *storage.SQLiteStore
+	IngestKey    string
+	InventoryKey string
+	Version      string
+	OIDC         OIDCConfig
 }
 
 // ProbeStatus is the last heartbeat the server has seen, held in memory.
@@ -38,11 +37,12 @@ type ProbeStatus struct {
 }
 
 type Server struct {
-	mux       *http.ServeMux
-	store     *storage.SQLiteStore
-	ingestKey string
-	version   string
-	auth      *authenticator
+	mux          *http.ServeMux
+	store        *storage.SQLiteStore
+	ingestKey    string
+	inventoryKey string
+	version      string
+	auth         *authenticator
 
 	mu    sync.Mutex
 	probe *ProbeStatus
@@ -50,11 +50,12 @@ type Server struct {
 
 func New(cfg Config) *Server {
 	s := &Server{
-		mux:       http.NewServeMux(),
-		store:     cfg.Store,
-		ingestKey: cfg.IngestKey,
-		version:   cfg.Version,
-		auth:      newAuthenticator(cfg.OIDC),
+		mux:          http.NewServeMux(),
+		store:        cfg.Store,
+		ingestKey:    cfg.IngestKey,
+		inventoryKey: cfg.InventoryKey,
+		version:      cfg.Version,
+		auth:         newAuthenticator(cfg.OIDC),
 	}
 	s.routes()
 	return s

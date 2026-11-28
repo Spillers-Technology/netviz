@@ -48,13 +48,14 @@ try {
 
       await openNav(page, profile, "probes");
       await page.getByRole("heading", { name: /^Connect (a probe|another network)$/ }).waitFor();
-      await captureView(page, errors, path.join(out, `server-${tag}-probes.png`));
+      await captureView(page, errors, path.join(out, `server-${tag}-legacy-probe-demo.png`));
       await context.close();
 
       // Live loading, empty, and refresh-error states, without a network scan.
       const liveContext = await browser.newContext({ viewport: profile, colorScheme: scheme, reducedMotion: "reduce" });
       const live = await liveContext.newPage();
       const liveErrors = trackErrors(live);
+      await live.route("**/api/management", (route) => route.fulfill({ json: { companies: [], probes: [], devices: [] } }));
       await live.route("**/api/me", (route) => route.fulfill({ json: { auth: false } }));
       await live.route("**/api/state", async (route) => {
         await new Promise((resolve) => setTimeout(resolve, 400));
@@ -72,6 +73,36 @@ try {
       // Chromium reports the intentionally aborted request as console.error.
       await captureView(live, liveErrors.filter((error) => !error.includes("net::ERR_FAILED")), path.join(out, `server-${tag}-error.png`));
       await liveContext.close();
+
+      const managedContext = await browser.newContext({ viewport: profile, colorScheme: scheme, reducedMotion: "reduce" });
+      const managed = await managedContext.newPage();
+      const managedErrors = trackErrors(managed);
+      await managed.route("**/api/me", (route) => route.fulfill({ json: { auth: false } }));
+      await managed.route("**/api/management", (route) => route.fulfill({
+        json: {
+          companies: [{ id: "customer", name: "Example Company" }],
+          probes: [
+            { id: "hq", site: "HQ", name: "West edge", companyId: "customer", cidr: "192.168.1.0/24", lastSeenAt: "2026-09-29T12:00:00Z" },
+            { id: "warehouse", site: "Warehouse", name: "East edge", companyId: "customer", cidr: "192.168.1.0/24", lastSeenAt: "2026-09-29T12:05:00Z" },
+          ],
+          devices: [{ id: "warehouse:192.168.1.2", probeId: "warehouse", companyId: "customer",
+            companyOverride: false, observation: { hostname: "warehouse-switch", ip: "192.168.1.2" } }],
+        },
+      }));
+      await managed.route("**/api/state*", (route) => {
+        const probe = new URL(route.request().url()).searchParams.get("probe");
+        const devices = probe ? [{ ip: "192.168.1.2", hostname: `${probe}-switch`, alive: true, open_ports: [] }] : [];
+        return route.fulfill({ json: { version: "synthetic", devices } });
+      });
+      await managed.goto(base, { waitUntil: "domcontentloaded" });
+      await managed.getByRole("combobox", { name: "Site and probe" }).click();
+      await managed.getByRole("option", { name: "Warehouse · East edge" }).click();
+      await managed.getByTitle("warehouse-switch").waitFor();
+      check(!(await managed.getByTitle("hq-switch").count()), "A device from another probe remained in the site view");
+      await openNav(managed, profile, "probes");
+      await managed.getByRole("heading", { name: "Managed probes" }).waitFor();
+      await captureView(managed, managedErrors, path.join(out, `server-${tag}-probes.png`));
+      await managedContext.close();
       console.log(`Captured ${tag} server views`);
     }
   }

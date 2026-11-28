@@ -16,9 +16,14 @@ No agents. No accounts. No Nmap. Just download and run.
 > **Authorized use only.** Scan networks you own or have explicit permission to
 > scan.
 
-**Current release: v1.1.0.** Windows builds are code-signed.
+Windows builds are code-signed.
 
 ---
+
+**Managing several sites?** In the NetViz console, register each scanner with
+its own probe key and choose a site. The Network workspace shows the selected
+probe's topology, and the Probes workspace holds company and device assignments.
+See the [probe deployment guide](PROBE_DEPLOYMENT.md#managing-multiple-sites-from-the-netviz-console).
 
 ## Download
 
@@ -198,23 +203,21 @@ macOS GUI/CLI install, logging, upgrade, and troubleshooting instructions.
 contract used for AnchorDesk) and serves the latest network state as a web UI
 with the same 3D network map as the desktop app.
 
-The public Linux amd64 image for NetViz 1.1.0 uses this digest:
+Start a local console with the published Linux amd64 image.
 
 ```sh
-docker run -p 8080:8080 -e NETVIZ_INGEST_KEY=your-probe-key \
+docker run -p 127.0.0.1:8080:8080 \
   -v netviz-data:/data \
-  ghcr.io/spillers-technology/netviz@sha256:7db718e2d6a750e85b7f16bf681818cb31421221296df07c35c2ff59a863cb40
-
-# then point a probe at it
-netviz-probe -url http://server-host:8080 -key your-probe-key -cidr 192.168.1.0/24
+  ghcr.io/spillers-technology/netviz:1.2.0
 ```
 
+Open the console and register a scanner under **Probes**. Configure the scanner
+with the console's reachable URL, its enrollment key, and its network range.
+Deployments that still use a shared key can set `NETVIZ_INGEST_KEY`.
 For other architectures, build from source with `deploy/Dockerfile`.
-The previous image remains available as `0.9.3` for deployments that need it.
 
-Probe endpoints are disabled until an ingest key is configured
-(`-ingest-key` or `NETVIZ_INGEST_KEY`). Open `http://server-host:8080/?demo`
-to preview the map with sample data before wiring a probe.
+Open `http://localhost:8080/?demo` to preview the map with sample data.
+Configure OIDC before publishing the management console to an untrusted network.
 
 To require SSO sign-in for the web UI and read APIs, point the server at any
 OIDC identity provider (Entra ID, Google, Keycloak, Authentik):

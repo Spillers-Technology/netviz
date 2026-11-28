@@ -195,7 +195,7 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 }
 
 func authExempt(path string) bool {
-	return path == "/healthz" ||
+	return path == "/healthz" || path == "/api/v1/inventory" ||
 		strings.HasPrefix(path, "/probe/") ||
 		strings.HasPrefix(path, "/auth/")
 }

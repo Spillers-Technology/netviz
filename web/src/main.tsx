@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -49,46 +49,55 @@ import {
 } from "@netviz/ui";
 import type { Identity, ProbeStatus, ServerState } from "./types";
 import { demoState } from "./demo";
+import ManagedProbes, { requestManagement, type ManagedInventory } from "./ManagedProbes";
 
 const REFRESH_MS = 10_000;
 const PROBE_STALE_MS = 5 * 60 * 1000;
 
 type Load = { status: "loading" } | { status: "ready" };
 
-function useServerState(demo: boolean) {
-  const [state, setState] = useState<ServerState | null>(null);
+function useServerState(demo: boolean, probeId: string) {
+  const [snapshot, setSnapshot] = useState<{ probeId: string; state: ServerState }>();
+  const state = snapshot?.probeId === probeId ? snapshot.state : null;
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<FriendlyError | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
 
+  const activeRequest = useRef<AbortController | null>(null);
   const refresh = useCallback(async () => {
+    activeRequest.current?.abort();
+    const request = new AbortController();
+    activeRequest.current = request;
     if (demo) {
-      setState(demoState());
+      setSnapshot({ probeId, state: demoState() });
       setRefreshedAt(new Date());
       setLoad({ status: "ready" });
       return;
     }
     setRefreshing(true);
     try {
-      const response = await fetch("/api/state");
+      const response = await fetch(probeId ? `/api/state?probe=${encodeURIComponent(probeId)}` : "/api/state", { signal: request.signal });
       if (!response.ok) throw new Error(`state request failed with status ${response.status}`);
       const next = (await response.json()) as ServerState;
-      setState({ ...next, devices: (next.devices || []).map(normalizeHost) });
+      if (request.signal.aborted) return;
+      setSnapshot({ probeId, state: { ...next, devices: (next.devices || []).map(normalizeHost) } });
       setRefreshedAt(new Date());
       setError(null);
     } catch (err) {
-      setError(friendlyError(err, "Refreshing the inventory"));
+      if (!request.signal.aborted) setError(friendlyError(err, "Refreshing the inventory"));
     } finally {
-      setRefreshing(false);
-      setLoad({ status: "ready" });
+      if (!request.signal.aborted) {
+        setRefreshing(false);
+        setLoad({ status: "ready" });
+      }
     }
-  }, [demo]);
+  }, [demo, probeId]);
 
   useEffect(() => {
     void refresh();
     const timer = window.setInterval(() => void refresh(), REFRESH_MS);
-    return () => window.clearInterval(timer);
+    return () => { activeRequest.current?.abort(); window.clearInterval(timer); };
   }, [refresh]);
 
   return { state, load, refreshing, error, refreshedAt, refresh };
@@ -104,7 +113,25 @@ function probeFreshness(probe?: ProbeStatus) {
 
 function App() {
   const demo = useMemo(() => new URLSearchParams(window.location.search).has("demo"), []);
-  const server = useServerState(demo);
+  const [probeId, setProbeId] = useState("");
+  const [managed, setManaged] = useState<ManagedInventory | null>(null);
+  const [managementError, setManagementError] = useState("");
+  const selectedProbeId = probeId || managed?.probes[0]?.id || "legacy";
+  const server = useServerState(demo, selectedProbeId === "legacy" ? "" : selectedProbeId);
+  const refreshManagement = useCallback(async () => {
+    if (demo) return;
+    try {
+      setManaged(await requestManagement<ManagedInventory>());
+      setManagementError("");
+    } catch (error) {
+      setManagementError((error as Error).message);
+    }
+  }, [demo]);
+  useEffect(() => {
+    void refreshManagement();
+    const timer = window.setInterval(() => void refreshManagement(), REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [refreshManagement]);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [workspace, setWorkspace] = useState<"network" | "probes">("network");
   const [view, setView] = useState<"devices" | "map">("devices");
@@ -135,7 +162,7 @@ function App() {
           Sign out {identity.name || identity.email || ""}
         </Button>
       )}
-      <Button variant="outlined" startIcon={<RefreshOutlined />} onClick={() => void server.refresh()} disabled={server.refreshing}>
+      <Button variant="outlined" startIcon={<RefreshOutlined />} onClick={() => { void server.refresh(); void refreshManagement(); }} disabled={server.refreshing}>
         {server.refreshing ? "Refreshing…" : "Refresh"}
       </Button>
     </>
@@ -159,9 +186,21 @@ function App() {
       <WorkspaceBoundary name={workspace === "network" ? "Network" : "Probes"}>
         {workspace === "network" ? (
           <NetworkPage
+            key={selectedProbeId}
             server={server}
             freshness={freshness}
-            actions={actions}
+            actions={(
+              <>
+                {!!managed?.probes.length && (
+                  <TextField select size="small" label="Site and probe" value={selectedProbeId}
+                    onChange={(event) => setProbeId(event.target.value)} sx={{ minWidth: 180 }}>
+                    <MenuItem value="legacy">Legacy feed</MenuItem>
+                    {managed.probes.map((row) => <MenuItem key={row.id} value={row.id}>{row.site} · {row.name}</MenuItem>)}
+                  </TextField>
+                )}
+                {actions}
+              </>
+            )}
             view={view}
             onViewChange={setView}
             search={search}
@@ -171,7 +210,7 @@ function App() {
             onSetUpProbe={() => setWorkspace("probes")}
           />
         ) : (
-          <ProbesPage server={server} freshness={freshness} actions={actions} />
+          <ProbesPage server={server} freshness={freshness} actions={actions} managed={managed} onChanged={refreshManagement} error={managementError} />
         )}
       </WorkspaceBoundary>
     </AppShell>
@@ -345,7 +384,14 @@ function NetworkPage({
   );
 }
 
-function ProbesPage({ server, freshness, actions }: { server: Server; freshness: Freshness; actions: React.ReactNode }) {
+function ProbesPage({ server, freshness, actions, managed, onChanged, error }: {
+  server: Server;
+  freshness: Freshness;
+  actions: React.ReactNode;
+  managed: ManagedInventory | null;
+  onChanged: () => Promise<void>;
+  error: string;
+}) {
   const toast = useToast();
   const probe = server.state?.probe;
   const command = `netviz-probe -url ${window.location.origin} -key <ingest key> -cidr 192.168.1.0/24`;
@@ -371,7 +417,9 @@ function ProbesPage({ server, freshness, actions }: { server: Server; freshness:
         {server.error && (
           <ErrorNotice error={{ ...server.error, lead: `${server.error.lead}${probe ? " The probe details below may be out of date." : ""}` }} />
         )}
-        {probe && (
+        {error && <Typography color="error">{error}</Typography>}
+        {managed && <ManagedProbes inventory={managed} onChanged={onChanged} />}
+        {!managed?.probes.length && probe && (
           <Paper component="section" aria-labelledby="probe-heading" sx={{ p: 2 }}>
             <Typography id="probe-heading" variant="h2" sx={{ mb: 1.5 }}>
               Connected probe
@@ -397,7 +445,7 @@ function ProbesPage({ server, freshness, actions }: { server: Server; freshness:
             </Typography>
           </Paper>
         )}
-        <Paper component="section" aria-labelledby="connect-heading" sx={{ p: 2 }}>
+        {!managed && !error && <Paper component="section" aria-labelledby="connect-heading" sx={{ p: 2 }}>
           <Typography id="connect-heading" variant="h2" sx={{ mb: 1 }}>
             {probe ? "Connect another network" : "Connect a probe"}
           </Typography>
@@ -417,7 +465,7 @@ function ProbesPage({ server, freshness, actions }: { server: Server; freshness:
             The ingest key is set on the server with <code>-ingest-key</code> or the <code>NETVIZ_INGEST_KEY</code> environment variable. The desktop app can install the probe as a
             service for you. Curious first? <Link href="?demo">Open sample data</Link>.
           </Typography>
-        </Paper>
+        </Paper>}
       </Stack>
     </Box>
   );

@@ -9,9 +9,10 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Probes authenticate with this key on X-Probe-Key. Ingest is disabled
-      # until it is set.
-      NETVIZ_INGEST_KEY: ${NETVIZ_INGEST_KEY:?set NETVIZ_INGEST_KEY}
+      # Optional shared key for scanners enrolled before managed probes.
+      NETVIZ_INGEST_KEY: ${NETVIZ_INGEST_KEY:-}
+      # Optional read-only inventory key for AnchorDesk.
+      NETVIZ_INVENTORY_KEY: ${NETVIZ_INVENTORY_KEY:-}
       # Optional OIDC SSO for the web UI; leave unset for trusted-LAN mode.
       NETVIZ_OIDC_ISSUER: ${NETVIZ_OIDC_ISSUER:-}
       NETVIZ_OIDC_CLIENT_ID: ${NETVIZ_OIDC_CLIENT_ID:-}

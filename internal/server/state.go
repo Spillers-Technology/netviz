@@ -1,6 +1,8 @@
 package server
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/Spillers-Technology/netviz/internal/model"
@@ -23,7 +25,12 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	runs, err := s.store.ListScanRuns(r.Context(), 1)
+	probeID := r.URL.Query().Get("probe")
+	if probeID != "" && probeID != "legacy" {
+		s.managedState(w, r, response, probeID)
+		return
+	}
+	runs, err := s.store.ListProbeRuns(r.Context(), "legacy", 1)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "list scan runs: "+err.Error())
 		return
@@ -48,7 +55,13 @@ func (s *Server) scans(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"scans": []any{}})
 		return
 	}
-	runs, err := s.store.ListScanRuns(r.Context(), 20)
+	var runs []model.ScanRun
+	var err error
+	if probeID := r.URL.Query().Get("probe"); probeID != "" {
+		runs, err = s.store.ListProbeRuns(r.Context(), probeID, 20)
+	} else {
+		runs, err = s.store.ListScanRuns(r.Context(), 20)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "list scan runs: "+err.Error())
 		return
@@ -57,4 +70,37 @@ func (s *Server) scans(w http.ResponseWriter, r *http.Request) {
 		runs = []model.ScanRun{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"scans": runs})
+}
+
+func (s *Server) managedState(w http.ResponseWriter, r *http.Request, response stateResponse, id string) {
+	probe, err := s.store.ManagedProbe(r.Context(), id)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "probe not found")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not read probe")
+		return
+	}
+	response.Probe = nil
+	if probe.LastSeen != nil {
+		response.Probe = &ProbeStatus{LastSeen: *probe.LastSeen, Version: probe.Version, CIDR: probe.CIDR, Status: probe.Status}
+	}
+	run, err := s.store.LatestManagedRun(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not read probe scan")
+		return
+	}
+	if run != nil {
+		response.Run = run
+		hosts, err := s.store.HostsForRun(r.Context(), run.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "could not read probe devices")
+			return
+		}
+		if hosts != nil {
+			response.Devices = hosts
+		}
+	}
+	writeJSON(w, http.StatusOK, response)
 }

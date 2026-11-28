@@ -1,6 +1,6 @@
 # Releasing NetViz
 
-NetViz GitHub Actions are intentionally self-hosted only.
+NetViz builds Linux packages and container images on GitHub-hosted Ubuntu. The Windows release build uses the self-hosted signing runner.
 
 Release artifacts are early FOSS builds. The desktop app is not yet a polished
 signed installer; `netviz-probe` is a native binary with built-in service
@@ -8,39 +8,15 @@ registration.
 
 ## Required Runner Labels
 
-Release builds target the standard self-hosted OS labels:
-
-- `self-hosted`, `Linux`
-- `self-hosted`, `Windows`
-
-GitHub Actions cannot dynamically skip missing self-hosted runner labels before a
-job is queued. If one OS is not available, that job will remain queued until a
-matching runner comes online.
+The Windows release build targets `self-hosted, Windows`. A queued Windows
+job needs a matching runner online.
 
 ## Runner Tooling
 
-Each release runner should be able to install or run:
-
-- Go 1.25.x through `actions/setup-go`
-- Node 22 through `actions/setup-node`
-- Wails v2 build prerequisites for that OS
-- GitHub Actions checkout/setup actions
-
-The Linux Docker publishing workflow also requires Docker/Buildx support on a
-`self-hosted`, `Linux` runner.
-
-The `Linux` runner also needs the GTK 3 and WebKitGTK 4.1 development packages
-for the Wails desktop build: `libgtk-3-dev` and `libwebkit2gtk-4.1-dev` on
-Debian 13 / Ubuntu 24.04+. Those distributions have no `webkit2gtk-4.0`, which
-is why the Linux builds pass `-tags webkit2_41` to `wails build`. The current
-Linux runner is an unprivileged LXC container (Debian 13, nesting enabled for
-Docker) on a Proxmox host, running the runner as a dedicated `runner` user under
-systemd.
-
-Windows runners must use a tool cache path without spaces. The workflows set
-`RUNNER_TOOL_CACHE` and `AGENT_TOOLSDIRECTORY` to `C:\actions-toolcache` for
-Windows jobs because setup actions can fail when the runner lives under paths
-such as `C:\Program Files\...`.
+The workflows install Go and Node. The Linux release job installs GTK 3 and
+WebKitGTK 4.1 from Ubuntu 24.04 for Wails. Windows needs a tool cache path without
+spaces, so the workflows set `RUNNER_TOOL_CACHE` and `AGENT_TOOLSDIRECTORY` to
+`C:\actions-toolcache`.
 
 The `Windows` runner also needs what code signing uses (see
 [Windows Code Signing](#windows-code-signing)):
@@ -174,7 +150,7 @@ Publishing:
 
 - Tag `vX.Y.Z` on main; publish the GitHub Release (tag push publishes the
   Docker image; the release event builds platform archives)
-- Confirm self-hosted runners are online — queued jobs mean a runner is down
+- Confirm the Windows signing runner is online
 - Run the `Signing check` workflow and confirm it passes before tagging
 - Confirm each platform archive and its `.sha256` attach to the release
 - Download the published Windows zip, extract it, and run

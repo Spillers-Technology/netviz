@@ -30,8 +30,14 @@ func OpenSQLite(path string) (*SQLiteStore, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Server probes and console writes share SQLite's single-writer store.
+	db.SetMaxOpenConns(1)
 	store := &SQLiteStore{db: db}
 	if err := store.migrate(context.Background()); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	if err := store.migrateManagedInventory(context.Background()); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -43,6 +49,18 @@ func (s *SQLiteStore) Close() error {
 }
 
 func (s *SQLiteStore) SaveScanRun(ctx context.Context, run model.ScanRun, hosts []model.HostObservation) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := saveScanRun(ctx, tx, run, hosts); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func saveScanRun(ctx context.Context, tx *sql.Tx, run model.ScanRun, hosts []model.HostObservation) error {
 	if run.ID == "" {
 		return fmt.Errorf("scan run ID is required")
 	}
@@ -50,14 +68,7 @@ func (s *SQLiteStore) SaveScanRun(ctx context.Context, run model.ScanRun, hosts 
 	if run.EndedAt.IsZero() {
 		run.EndedAt = time.Now().UTC()
 	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	_, err = tx.ExecContext(ctx, `
+	_, err := tx.ExecContext(ctx, `
 		INSERT INTO scan_runs (id, cidr, started_at, ended_at, host_count, alive_count, open_port_count)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
@@ -100,19 +111,31 @@ func (s *SQLiteStore) SaveScanRun(ctx context.Context, run model.ScanRun, hosts 
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 func (s *SQLiteStore) ListScanRuns(ctx context.Context, limit int) ([]model.ScanRun, error) {
+	return s.listScanRuns(ctx, limit, "", nil)
+}
+
+// ListProbeRuns uses "legacy" to select reports sent with the old shared key.
+func (s *SQLiteStore) ListProbeRuns(ctx context.Context, probeID string, limit int) ([]model.ScanRun, error) {
+	if probeID == "legacy" {
+		return s.listScanRuns(ctx, limit, "WHERE managed_probe_id IS NULL", nil)
+	}
+	return s.listScanRuns(ctx, limit, "WHERE managed_probe_id = ?", []any{probeID})
+}
+
+func (s *SQLiteStore) listScanRuns(ctx context.Context, limit int, where string, args []any) ([]model.ScanRun, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, cidr, started_at, ended_at, host_count, alive_count, open_port_count
-		FROM scan_runs
+		FROM scan_runs `+where+`
 		ORDER BY started_at DESC
 		LIMIT ?
-	`, limit)
+	`, append(args, limit)...)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +313,9 @@ func (s *SQLiteStore) PruneScanRuns(ctx context.Context, keep int) (int, error) 
 	}
 	defer tx.Rollback()
 
-	const keepQuery = `SELECT id FROM scan_runs ORDER BY started_at DESC LIMIT ?`
+	const keepQuery = `
+		SELECT id FROM (SELECT id FROM scan_runs ORDER BY started_at DESC LIMIT ?)
+		UNION SELECT latest_run_id FROM managed_probes WHERE latest_run_id IS NOT NULL`
 	if _, err := tx.ExecContext(ctx, `DELETE FROM host_observations WHERE run_id NOT IN (`+keepQuery+`)`, keep); err != nil {
 		return 0, err
 	}
@@ -431,6 +456,7 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 
 	for _, stmt := range []string{
 		`ALTER TABLE host_observations ADD COLUMN mac_address TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE scan_runs ADD COLUMN managed_probe_id TEXT`,
 		`ALTER TABLE host_observations ADD COLUMN vendor TEXT NOT NULL DEFAULT ''`,
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {

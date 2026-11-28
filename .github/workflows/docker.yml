@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   publish:
-    runs-on: [self-hosted, Linux]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

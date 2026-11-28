@@ -226,3 +226,22 @@ standard install location and re-registers the service.
   scan can mark them down; that short-lived cache resets when the process
   restarts.
 - v0.1.0 scans one CIDR. Deploy another probe for a separate LAN/VLAN.
+
+## Managing multiple sites from the NetViz console
+
+In **Probes**, create companies as needed and use **New probe** to register each
+scanner with a site name and optional default company. Copy its enrollment key
+when the console displays it. Point the scanner at the NetViz server URL with
+that key and set its CIDR in its own configuration. **Network → Site and probe**
+selects that scanner's most recent topology and heartbeat.
+
+In **Device assignments**, set a company for a specific device, leave it
+unassigned, or inherit the probe default. Companies and device assignments go
+to AnchorDesk through `GET /api/v1/inventory` when you configure
+`NETVIZ_INVENTORY_KEY` on both servers and set `NETVIZ_URL` on AnchorDesk. The
+inventory key is read-only. Each managed scanner has a separate enrollment key.
+
+The legacy shared key and direct-to-AnchorDesk reporting remain available during
+migration. Repoint each existing scanner once its managed probe is registered.
+Verify its site view and its first AnchorDesk sync before retiring the previous
+configuration.
